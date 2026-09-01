@@ -8,6 +8,15 @@ from utils.cleanup import safe_delete, delete_after
 router = Router()
 
 
+async def get_claim_keyboard() -> InlineKeyboardMarkup:
+    users = await UserRepository.get_all_users()
+    buttons = []
+    for u in users:
+        if not u.get("telegram_id"):
+            buttons.append([InlineKeyboardButton(text=f"👤 Men {u['name']}man (Xona {u['room_number']})", callback_data=f"claim_user:{u['id']}")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message, command: CommandObject, current_user: dict, bot: Bot):
     if message.chat.type in ("group", "supergroup"):
@@ -35,6 +44,9 @@ async def cmd_start(message: Message, command: CommandObject, current_user: dict
         from handlers.swap import start_swap_flow_pm
         await start_swap_flow_pm(message, current_user)
         return
+    elif payload == "unbind":
+        await UserRepository.unbind_user_by_telegram_id(message.from_user.id)
+        current_user = None
 
     name = message.from_user.full_name
     text = (
@@ -46,21 +58,50 @@ async def cmd_start(message: Message, command: CommandObject, current_user: dict
 
     if current_user:
         text += f"✅ Siz tizimda <b>{current_user['name']}</b> (Xona {current_user['room_number']}) sifatida bog'langansiz."
+        reselect_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🔄 Profilni qayta tanlash / Unbind", callback_data="reselect_profile")
+        ]])
         await message.answer(text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
+        await message.answer("Agar profilingiz xato tanlangan bo'lsa, quyidagi tugmani bosing:", reply_markup=reselect_kb)
     else:
         text += "⚠️ Sizning Telegram hisobingiz hali xonadondagi profilingizga bog'lanmagan. Iltimos, ismingizni tanlang:"
-        users = await UserRepository.get_all_users()
-        buttons = []
-        for u in users:
-            if not u.get("telegram_id"):
-                buttons.append([InlineKeyboardButton(text=f"👤 Men {u['name']}man (Xona {u['room_number']})", callback_data=f"claim_user:{u['id']}")])
-        
-        if not buttons:
+        kb = await get_claim_keyboard()
+        if not kb.inline_keyboard:
             text += "\n\n(Barcha 8 ta profil bog'lab bo'lingan. Admin yordamida o'zgartirishingiz mumkin.)"
             await message.answer(text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
         else:
-            kb = InlineKeyboardMarkup(inline_keyboard=buttons)
             await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+
+@router.message(Command("unbind"))
+@router.message(Command("qayta_tanlash"))
+async def cmd_unbind(message: Message):
+    is_group = message.chat.type in ("group", "supergroup")
+    if is_group:
+        await safe_delete(message)
+
+    await UserRepository.unbind_user_by_telegram_id(message.from_user.id)
+    kb = await get_claim_keyboard()
+
+    text = (
+        "🔄 <b>Profilingiz uzildi (Unbind qilindi).</b>\n\n"
+        "Iltimos, o'zingizga tegishli haqiqiy profilingizni tanlang:"
+    )
+
+    msg = await message.answer(text, reply_markup=kb, parse_mode="HTML")
+    if is_group:
+        await delete_after(msg, 45)
+
+
+@router.callback_query(F.data == "reselect_profile")
+async def callback_reselect_profile(callback: CallbackQuery):
+    await UserRepository.unbind_user_by_telegram_id(callback.from_user.id)
+    kb = await get_claim_keyboard()
+    await callback.message.edit_text(
+        "🔄 <b>Profilingiz uzildi.</b>\n\nIltimos, o'zingizning haqiqiy profilingizni tanlang:",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
 
 
 @router.callback_query(F.data.startswith("claim_user:"))
@@ -73,11 +114,14 @@ async def callback_claim_user(callback: CallbackQuery):
         await callback.answer("Foydalanuvchi topilmadi!", show_alert=True)
         return
 
-    if user.get("telegram_id"):
+    if user.get("telegram_id") and user.get("telegram_id") != tg_id:
         await callback.answer("Ushbu profil allaqachon boshqa foydalanuvchiga bog'langan!", show_alert=True)
         return
 
+    # First unbind any previous profile bound to this telegram_id
+    await UserRepository.unbind_user_by_telegram_id(tg_id)
     await UserRepository.bind_telegram_id(user_id, tg_id)
+    
     await callback.message.edit_text(
         f"🎉 Tabriklaymiz! Siz muvaffaqiyatli <b>{user['name']}</b> (Xona {user['room_number']}) profili bilan bog'landindingiz!",
         parse_mode="HTML"
@@ -104,7 +148,9 @@ async def cmd_help(message: Message):
         "• 3-hafta (15–21 kunlar): Avazbek & Firdavs\n"
         "• 4-hafta (22–oy oxiri): Mavlonbek & Asadbek\n\n"
         "<b>🔄 Navbat Almashish (/almashish):</b>\n"
-        "• Kunlik navbatchilik, butun haftalik juftlik yoki juftlik ichida alohida o'rinbosar almashish imkoniyati.\n"
+        "• Kunlik navbatchilik, butun haftalik juftlik yoki juftlik ichida alohida o'rinbosar almashish imkoniyati.\n\n"
+        "<b>⚙️ Profilni Qayta Tanlash:</b>\n"
+        "• <code>/unbind</code> yoki <code>/qayta_tanlash</code> - Profilingizni bekor qilib yangitdan tanlash.\n"
     )
     
     msg = await message.answer(text, parse_mode="HTML")

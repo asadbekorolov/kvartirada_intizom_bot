@@ -153,9 +153,27 @@ async def run_tests():
 
     await client.close()
 
+    print("\n7. Testing User Unbind and Profile Re-selection...")
+    # Bind User 8 (Mavlonbek) to test TG ID
+    await UserRepository.bind_telegram_id(8, 6149675718)
+    u8 = await UserRepository.get_user_by_id(8)
+    assert u8["telegram_id"] == 6149675718
+    
+    # Unbind and rebind User 7 (Asadbek)
+    await UserRepository.unbind_user_by_telegram_id(6149675718)
+    u8_unbound = await UserRepository.get_user_by_id(8)
+    assert u8_unbound["telegram_id"] is None
+    print("✅ User 8 Unbind OK: telegram_id is None")
+
+    await UserRepository.bind_telegram_id(7, 6149675718)
+    u7 = await UserRepository.get_user_by_id(7)
+    assert u7["telegram_id"] == 6149675718
+    print(f"✅ User 7 Re-bind OK: {u7['name']} -> TG ID {u7['telegram_id']}")
+
     print("\n" + "=" * 60)
     print("🎉 ALL TESTS PASSED SUCCESSFULLY! PROD-READY SYSTEM VERIFIED!")
     print("=" * 60)
+
 
     # Clean up test db file
     try:

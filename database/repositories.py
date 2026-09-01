@@ -33,14 +33,29 @@ class UserRepository:
             return dict(row) if row else None
 
     @staticmethod
-    async def bind_telegram_id(user_id: int, telegram_id: int) -> bool:
+    async def bind_telegram_id(user_id: int, telegram_id: Optional[int]) -> bool:
         async with get_db() as db:
             await db.execute("UPDATE users SET telegram_id = ? WHERE id = ?", (telegram_id, user_id))
             await db.commit()
             return True
 
     @staticmethod
+    async def unbind_telegram_id(user_id: int) -> bool:
+        async with get_db() as db:
+            await db.execute("UPDATE users SET telegram_id = NULL WHERE id = ?", (user_id,))
+            await db.commit()
+            return True
+
+    @staticmethod
+    async def unbind_user_by_telegram_id(telegram_id: int) -> bool:
+        async with get_db() as db:
+            await db.execute("UPDATE users SET telegram_id = NULL WHERE telegram_id = ?", (telegram_id,))
+            await db.commit()
+            return True
+
+    @staticmethod
     async def set_admin(user_id: int, is_admin: bool) -> bool:
+
         async with get_db() as db:
             await db.execute("UPDATE users SET is_admin = ? WHERE id = ?", (1 if is_admin else 0, user_id))
             await db.commit()

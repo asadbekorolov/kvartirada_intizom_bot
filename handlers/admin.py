@@ -179,10 +179,11 @@ async def cmd_bind_admin(message: Message):
         await safe_delete(message)
 
     args = message.text.split()[1:]
-    if len(args) < 2 or not args[0].isdigit() or not args[1].isdigit():
+    if len(args) < 2 or not args[0].isdigit():
         msg = await message.answer(
-            "⚠️ Foydalanish: <code>/bind_admin &lt;user_id&gt; &lt;telegram_id&gt;</code>\n"
-            "Misol: <code>/bind_admin 1 123456789</code>",
+            "⚠️ Foydalanish: <code>/bind_admin &lt;user_id&gt; &lt;telegram_id|0&gt;</code>\n"
+            "• Bog'lash: <code>/bind_admin 7 6149675718</code>\n"
+            "• Uzish (Unbind): <code>/bind_admin 8 0</code>",
             parse_mode="HTML"
         )
         if is_group:
@@ -190,7 +191,7 @@ async def cmd_bind_admin(message: Message):
         return
 
     user_id = int(args[0])
-    tg_id = int(args[1])
+    target_val = args[1].lower().strip()
 
     user = await UserRepository.get_user_by_id(user_id)
     if not user:
@@ -199,10 +200,24 @@ async def cmd_bind_admin(message: Message):
             await delete_after(msg, 30)
         return
 
-    await UserRepository.bind_telegram_id(user_id, tg_id)
-    msg = await message.answer(
-        f"✅ <b>{user['name']}</b> profiliga Telegram ID <code>{tg_id}</code> biriktirildi!",
-        parse_mode="HTML"
-    )
+    if target_val in ("0", "null", "none", "unbind"):
+        await UserRepository.unbind_telegram_id(user_id)
+        msg = await message.answer(
+            f"✅ <b>{user['name']}</b> (ID {user_id}) profili Telegram ID dan uzildi (Unbind qilindi)!",
+            parse_mode="HTML"
+        )
+    elif target_val.isdigit():
+        tg_id = int(target_val)
+        # Unbind any previous profile bound to this telegram_id
+        await UserRepository.unbind_user_by_telegram_id(tg_id)
+        await UserRepository.bind_telegram_id(user_id, tg_id)
+        msg = await message.answer(
+            f"✅ <b>{user['name']}</b> profiliga Telegram ID <code>{tg_id}</code> biriktirildi!",
+            parse_mode="HTML"
+        )
+    else:
+        msg = await message.answer("❌ Noto'g'ri Telegram ID kiritildi!")
+
     if is_group:
         await delete_after(msg, 30)
+
