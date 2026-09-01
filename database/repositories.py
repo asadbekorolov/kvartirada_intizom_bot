@@ -12,6 +12,13 @@ class UserRepository:
             return [dict(r) for r in rows]
 
     @staticmethod
+    async def get_users_by_room(room_number: int) -> List[Dict[str, Any]]:
+        async with get_db() as db:
+            cursor = await db.execute("SELECT * FROM users WHERE room_number = ? ORDER BY id ASC", (room_number,))
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    @staticmethod
     async def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
         async with get_db() as db:
             cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -68,6 +75,46 @@ class DutyRepository:
     async def clear_weekly_overrides(week_number: int):
         async with get_db() as db:
             await db.execute("DELETE FROM daily_overrides WHERE week_number = ?", (week_number,))
+            await db.commit()
+
+    @staticmethod
+    async def get_weekly_pair_assignment(month_year: str, week_index: int) -> Optional[Dict[str, Any]]:
+        async with get_db() as db:
+            cursor = await db.execute(
+                """
+                SELECT * FROM weekly_pair_assignments
+                WHERE month_year = ? AND week_index = ?
+                """,
+                (month_year, week_index)
+            )
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    @staticmethod
+    async def set_weekly_pair_assignment(
+        month_year: str, week_index: int, pair_id: int, member1_id: int, member2_id: int
+    ):
+        async with get_db() as db:
+            await db.execute(
+                """
+                INSERT INTO weekly_pair_assignments (month_year, week_index, pair_id, member1_id, member2_id)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(month_year, week_index) DO UPDATE SET
+                    pair_id = excluded.pair_id,
+                    member1_id = excluded.member1_id,
+                    member2_id = excluded.member2_id
+                """,
+                (month_year, week_index, pair_id, member1_id, member2_id)
+            )
+            await db.commit()
+
+    @staticmethod
+    async def clear_weekly_pair_assignment(month_year: str, week_index: int):
+        async with get_db() as db:
+            await db.execute(
+                "DELETE FROM weekly_pair_assignments WHERE month_year = ? AND week_index = ?",
+                (month_year, week_index)
+            )
             await db.commit()
 
 
@@ -130,35 +177,61 @@ class TaskRepository:
 
 class WaterRepository:
     @staticmethod
-    async def get_current_water_index() -> int:
+    async def get_room_water_index(room_id: int) -> int:
         async with get_db() as db:
-            cursor = await db.execute("SELECT current_user_index FROM water_state WHERE id = 1")
+            cursor = await db.execute("SELECT current_user_index FROM room_water_state WHERE room_id = ?", (room_id,))
             row = await cursor.fetchone()
             return row["current_user_index"] if row else 0
 
     @staticmethod
-    async def set_current_water_index(new_index: int):
+    async def set_room_water_index(room_id: int, new_index: int):
         async with get_db() as db:
-            await db.execute("UPDATE water_state SET current_user_index = ? WHERE id = 1", (new_index % 8,))
+            await db.execute(
+                """
+                INSERT INTO room_water_state (room_id, current_user_index)
+                VALUES (?, ?)
+                ON CONFLICT(room_id) DO UPDATE SET current_user_index = excluded.current_user_index
+                """,
+                (room_id, new_index % 4)
+            )
             await db.commit()
 
     @staticmethod
-    async def add_water_log(brought_by_user_id: int, photo_file_id: str, created_at: str) -> int:
+    async def add_room_water_log(room_id: int, brought_by_user_id: int, photo_file_id: str, created_at: str) -> int:
         async with get_db() as db:
             cursor = await db.execute(
-                "INSERT INTO water_logs (brought_by_user_id, photo_file_id, created_at) VALUES (?, ?, ?)",
-                (brought_by_user_id, photo_file_id, created_at)
+                """
+                INSERT INTO room_water_logs (room_id, brought_by_user_id, photo_file_id, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (room_id, brought_by_user_id, photo_file_id, created_at)
             )
             await db.commit()
             return cursor.lastrowid
 
     @staticmethod
-    async def get_water_logs(limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_room_water_logs(room_id: int, limit: int = 10) -> List[Dict[str, Any]]:
         async with get_db() as db:
             cursor = await db.execute(
                 """
                 SELECT wl.*, u.name as brought_by_name
-                FROM water_logs wl
+                FROM room_water_logs wl
+                JOIN users u ON wl.brought_by_user_id = u.id
+                WHERE wl.room_id = ?
+                ORDER BY wl.id DESC LIMIT ?
+                """,
+                (room_id, limit)
+            )
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    @staticmethod
+    async def get_all_recent_water_logs(limit: int = 10) -> List[Dict[str, Any]]:
+        async with get_db() as db:
+            cursor = await db.execute(
+                """
+                SELECT wl.*, u.name as brought_by_name
+                FROM room_water_logs wl
                 JOIN users u ON wl.brought_by_user_id = u.id
                 ORDER BY wl.id DESC LIMIT ?
                 """,
@@ -171,16 +244,16 @@ class WaterRepository:
 class SwapRepository:
     @staticmethod
     async def create_swap_request(
-        request_id: str, requester_id: int, target_id: int, day_of_week: int, target_date: str
+        request_id: str, requester_id: int, target_id: int, swap_type: str, target_info: str
     ):
         async with get_db() as db:
             now_str = datetime.now().isoformat()
             await db.execute(
                 """
-                INSERT INTO swap_requests (id, requester_id, target_id, day_of_week, target_date, status, created_at)
+                INSERT INTO swap_requests (id, requester_id, target_id, swap_type, target_info, status, created_at)
                 VALUES (?, ?, ?, ?, ?, 'PENDING', ?)
                 """,
-                (request_id, requester_id, target_id, day_of_week, target_date, now_str)
+                (request_id, requester_id, target_id, swap_type, target_info, now_str)
             )
             await db.commit()
 

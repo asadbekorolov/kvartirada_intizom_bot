@@ -1,120 +1,92 @@
-# 🏢 Kvartira Bot — Household Management Telegram Bot
+# 🏢 Kvartira Bot — Flatmate Household Management System
 
-A production-ready, modular, and resilient Telegram bot built with **aiogram 3.x**, **APScheduler**, and **SQLite (via aiosqlite)** for an 8-person flatmate household.
-
----
-
-## 👥 Flatmate Household Roster & Initial Data
-
-| ID | Name | Room | Default Duty Role & Water Queue Index |
-|---|---|---|---|
-| 1 | Avazbek | Room 1 | Sat Daily Duty | Sat Laundry | Water Index 0 |
-| 2 | Firdavs | Room 1 | Tue Daily Duty | Mon Laundry | Water Index 1 |
-| 3 | Asadbek bro | Room 1 | Thu Daily Duty | Wed Laundry | Water Index 2 |
-| 4 | Omadbek | Room 1 | Sun Daily Duty (Pair) | Thu Laundry | Water Index 3 |
-| 5 | Ilyosbek | Room 2 | Sun Daily Duty (Pair) | Sat Laundry | Water Index 4 |
-| 6 | Jaloliddin | Room 2 | Mon Daily Duty | Tue Laundry | Water Index 5 |
-| 7 | Asadbek | Room 2 | Wed Daily Duty | Fri Laundry | Water Index 6 |
-| 8 | Mavlonbek | Room 2 | Fri Daily Duty | Sun Laundry | Water Index 7 |
+A production-ready, modular, and resilient Telegram bot built with **aiogram 3.x**, **APScheduler**, **aiohttp**, and **SQLite (via aiosqlite)** for an 8-person flatmate household.
 
 ---
 
-## 🌟 Key Features & Modules
+## 👥 Flatmate Roster & Room Assignments
 
-### 📅 Module A: Daily Task Management & Interactive Checklist
-- **07:30 Tashkent Morning Briefing:** Broadcasts today's daily lead, laundry lead, and water queue person to the Telegram group chat with an interactive checklist:
-  - `[ ❌ / ✅ ] Taom tayyorlash`
-  - `[ ❌ / ✅ ] Non olib kelish`
-  - `[ ❌ / ✅ ] Umumiy idishlar / xontaxta tozaligi`
-  - `[ ❌ / ✅ ] Axlat to'kish (Oshxona & Tualet)`
-- **Dynamic State Engine:** Instant inline button toggling without chat spam.
-- **Automated Celebration:** Automatically posts a celebration message when all 4 core tasks are completed.
-- **21:30 Evening Enforcement:** Sends a firm reminder tagging active daily duty leads if `Axlat to'kish` remains incomplete.
+### 🏠 1-Xona (Room 1):
+1. **Avazbek** (ID 1)
+2. **Firdavs** (ID 2)
+3. **Asadbek bro** (ID 3)
+4. **Omadbek** (ID 4)
+* **Water Queue (1-Xona Baki):** `Avazbek ➔ Firdavs ➔ Asadbek bro ➔ Omadbek` (Circular)
 
-### 🚰 Module B: Event-Driven Water Queue (Photo Verification & Proxy Logic)
-- Initiate via `/suv` or `🚰 Suv olib keldim` reply button.
-- Select bringer name -> Send photo proof.
-- Calculates circular next person: `(bringer_index + 1) % 8`.
-- Out-of-turn / Proxy support: Recalculates circular queue starting from whoever brought water.
-
-### 🔄 Module C: Peer-to-Peer Duty Swap Engine
-- Initiate via `/almashish` or `🔄 Navbat almashish` button.
-- Select target day & flatmate -> Dispatches inline approval card `[ ✅ Roziman ]` / `[ ❌ Rad etish ]`.
-- Updates `daily_overrides` table upon approval.
-- Auto-resets temporary weekly overrides every Sunday at 23:59 Asia/Tashkent.
-
-### 🧹 Module D: Yakshanbalik General Uborqa (Sunday Deep Clean)
-- Triggers every Sunday at 09:00 Tashkent Time with an 11-point inspection checklist for rotating Sunday cleaning pairs:
-  - Pair 1: Omadbek & Asadbek bro
-  - Pair 2: Ilyosbek & Jaloliddin
-  - Pair 3: Avazbek & Firdavs
-  - Pair 4: Mavlonbek & Asadbek
-
-### ⚙️ Module E: Protected Admin Operations
-- `/suv_admin <user_id>`: Force-sets current water index.
-- `/almash_admin <day_index> <user_ids>`: Force-swaps daily duty schedule.
-- `/reset_tasks`: Resets daily checklist states.
-- `/bind_admin <user_id> <telegram_id>`: Force-binds Telegram ID to flatmate profile.
+### 🚪 2-Xona (Room 2):
+5. **Ilyosbek** (ID 5)
+6. **Jaloliddin** (ID 6)
+7. **Asadbek** (ID 7)
+8. **Mavlonbek** (ID 8)
+* **Water Queue (2-Xona Baki):** `Ilyosbek ➔ Jaloliddin ➔ Asadbek ➔ Mavlonbek` (Circular)
 
 ---
 
-## 📁 Directory Architecture
+## 🗓️ Default Rotations & Schedules
 
+### 👨‍🍳 Kunlik Navbatchilik (`daily_duty`):
+* **Dushanba:** Jaloliddin (6)
+* **Seshanba:** Firdavs (2)
+* **Chorshanba:** Asadbek (7)
+* **Payshanba:** Asadbek bro (3)
+* **Juma:** Mavlonbek (8)
+* **Shanba:** Avazbek (1)
+* **Yakshanba:** Omadbek (4) & Ilyosbek (5)
+
+### 🧺 Kir Yuvish Navbati (`laundry_duty`):
+* **Dushanba:** Firdavs (2) / Mavlonbek (8)
+* **Seshanba:** Jaloliddin (6)
+* **Chorshanba:** Asadbek bro (3)
+* **Payshanba:** Omadbek (4)
+* **Juma:** Asadbek (7)
+* **Shanba:** Ilyosbek (5)
+* **Yakshanba:** Avazbek (1) / Mavlonbek (8)
+
+### 👥 Oylik 4-Haftalik Juftliklar (Bozorlik & General Uborqa):
+* **1-hafta (1–7 kunlar):** Omadbek (4) & Asadbek bro (3)
+* **2-hafta (8–14 kunlar):** Ilyosbek (5) & Jaloliddin (6)
+* **3-hafta (15–21 kunlar):** Avazbek (1) & Firdavs (2)
+* **4-hafta (22–oy oxiri):** Mavlonbek (8) & Asadbek (7)
+
+---
+
+## 🌟 Asosiy Imkoniyatlar & Anti-Spam UX
+
+1. **Anti-Spam & Guruh Tozaligi:**
+   - Guruhdagi barcha buyruqlar (`/start`, `/bugun`, `/suv`, `/hafta`, `/almashish`) avtomatik ravishda o'chiriladi (`await message.delete()`).
+   - Tugmalar bosilganda xabar ichida o'zgaradi (In-Place Edit), yangi ortiqcha xabarlar chiqarilmaydi.
+   - Interaktiv jarayonlar (rasm yuborish, navbat tanlash) to'liq botning shaxsiy chatiga (PM) deep-link orqali yo'naltiriladi.
+   - Guruhdagi vaqtinchalik xabarlar 30 soniyadan so'ng avtomatik o'chiriladi.
+
+2. **2 ta Alohida Suv Baki (Dual-Room Queues):**
+   - 1-xona va 2-xona alohida baklar navbatini mustaqil boshqaradi.
+   - Rasm proof (Foto) faqat PM da qabul qilinadi va yakunlangach guruhga 1 ta chiroyli hisobot beriladi.
+
+3. **Kengaytirilgan Almashuv Tizimi (`/almashish`):**
+   - **Kunlik navbatchilik almashish** (masalan: Dushanba kungi navbatni boshqa kishi bilan almashish).
+   - **Haftalik juftlik almashish** (masalan: 1-hafta juftligi 3-hafta juftligi bilan to'liq almashishi).
+   - **Juftlik ichida o'rinbosar biriktirish** (masalan: Omadbek o'z o'rniga boshqa xonadoshni biriktirishi).
+
+4. **Avtomatlashtirilgan Eslatmalar (Asia/Tashkent):**
+   - **07:30** — Kunlik brifing + 4 ta vazifa nazorat ro'yxati (Taom, Non, Idishlar, Axlat).
+   - **21:30** — Axlat to'kilmagan bo'lsa navbatchilarni teg qilib qattiq eslatma yuborish.
+   - **Yakshanba 09:00** — 11 ta punktli general tozalik nazorat ro'yxati.
+   - **Yakshanba 23:59** — Vaqtinchalik o'zgartirishlarni avtomatik tozalash va standart rejani tiklash.
+
+5. **24/7 Keep-Alive HTTP Server:**
+   - Render / Koyeb platformalarida uxlab qolmasligi uchun `http://0.0.0.0:8080/health` endpointi faol.
+
+---
+
+## 🛠️ O'rnatish va Ishga Tushirish
+
+```bash
+# Virtual environment yaratish va paketlarni o'rnatish
+pip install -r requirements.txt
+
+# Testlarni yurgazish
+python test_bot.py
+
+# Botni ishga tushirish
+python bot.py
 ```
-kvartira_bot/
-├── .env.example              # Environment variables template
-├── .env                      # Production environment configuration
-├── requirements.txt          # Python dependencies
-├── config.py                 # Pydantic Settings & timezone helper
-├── database/
-│   ├── connection.py         # SQLite connection manager & auto-seeding
-│   ├── schema.sql            # Table DDL definitions
-│   └── repositories.py       # Async CRUD repositories
-├── services/
-│   ├── queue_service.py      # Duty rotation & circular queue calculations
-│   └── scheduler_jobs.py     # APScheduler 07:30, 21:30, Sun 09:00, Sun 23:59 jobs
-├── states.py                 # FSM States (Water, Swap)
-├── keyboards/
-│   ├── inline.py             # Dynamic checklist & approval inline keyboards
-│   └── reply.py              # Persistent main menu reply keyboard
-├── middlewares/
-│   ├── auth.py               # Telegram user profile mapper
-│   └── admin.py              # IsAdminFilter command guard
-├── handlers/
-│   ├── common.py             # /start, /help, claim profile
-│   ├── duty.py               # /bugun & task toggle callbacks
-│   ├── water.py              # /suv photo submission & queue advance
-│   ├── swap.py               # /almashish peer swap workflow
-│   └── admin.py              # Admin override commands
-├── test_bot.py               # Standalone unit & integration test runner
-└── bot.py                    # Application entry point
-```
-
----
-
-## 🚀 Installation & Quick Start
-
-1. **Clone/Navigate to Project:**
-   ```bash
-   cd C:\Users\asadb\.gemini\antigravity-ide\scratch\kvartira_bot
-   ```
-
-2. **Set up Environment Variables:**
-   Edit `.env`:
-   ```ini
-   BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-   GROUP_CHAT_ID=-1001234567890
-   ADMIN_USER_IDS=12345678,87654321
-   BOT_TZ=Asia/Tashkent
-   DB_PATH=kvartira.db
-   ```
-
-3. **Run Unit & Integration Tests:**
-   ```bash
-   .venv\Scripts\python.exe test_bot.py
-   ```
-
-4. **Launch Bot:**
-   ```bash
-   .venv\Scripts\python.exe bot.py
-   ```

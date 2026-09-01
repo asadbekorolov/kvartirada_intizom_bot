@@ -1,45 +1,87 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from states import WaterStates
+from config import settings
 from services.queue_service import QueueService
 from database.repositories import UserRepository
-from keyboards.inline import build_water_bringer_keyboard
+from keyboards.inline import build_water_room_keyboard, build_water_bringer_keyboard
+from utils.cleanup import safe_delete, delete_after
 
 router = Router()
 
 
-@router.message(Command("suv"))
-@router.message(F.text == "🚰 Suv olib keldim")
-async def cmd_water_start(message: Message, state: FSMContext):
-    users = await UserRepository.get_all_users()
-    keyboard = build_water_bringer_keyboard(users)
-    await state.set_state(WaterStates.waiting_for_bringer)
+async def start_water_flow_for_room(message: Message, room_id: int, state: FSMContext = None):
+    users = await UserRepository.get_users_by_room(room_id)
+    keyboard = build_water_bringer_keyboard(users, room_id)
+    if state:
+        await state.set_state(WaterStates.waiting_for_bringer)
+        await state.update_data(room_id=room_id)
     await message.answer(
-        "🚰 <b>Suv olib kelish navbatini qayd etish</b>\n\n"
-        "Suvni kim olib keldi? Iltimos, pastdagi ro'yxatdan tanlang:",
+        f"🚰 <b>{room_id}-Xona Baki: Suv keltirish</b>\n\n"
+        f"Suvni kim olib keldi? Quyidagi ro'yxatdan tanlang:",
         reply_markup=keyboard,
         parse_mode="HTML"
     )
 
 
-@router.callback_query(F.data.startswith("water_bringer:"), WaterStates.waiting_for_bringer)
-async def callback_select_water_bringer(callback: CallbackQuery, state: FSMContext):
-    bringer_id = int(callback.data.split(":")[1])
-    bringer = await UserRepository.get_user_by_id(bringer_id)
-
-    if not bringer:
-        await callback.answer("Foydalanuvchi topilmadi!", show_alert=True)
+@router.message(Command("suv"))
+@router.message(F.text == "🚰 Suv olib keldim")
+async def cmd_water_start(message: Message, state: FSMContext, bot: Bot):
+    # If in group, redirect to PM to avoid chat clutter
+    if message.chat.type in ("group", "supergroup"):
+        await safe_delete(message)
+        me = await bot.get_me()
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🏠 1-Xona Suvi (PM)", url=f"https://t.me/{me.username}?start=water_r1"),
+                InlineKeyboardButton(text="🚪 2-Xona Suvi (PM)", url=f"https://t.me/{me.username}?start=water_r2"),
+            ]
+        ])
+        msg = await message.answer(
+            "🚰 <b>Suv olib kelishni qayd etish</b>\n\n"
+            "Guruhda ortiqcha xabar to'planmasligi uchun iltimos, botning shaxsiy chatiga o'ting:",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
+        await delete_after(msg, 30)
         return
 
-    await state.update_data(bringer_id=bringer_id)
-    await state.set_state(WaterStates.waiting_for_photo_proof)
+    # In PM:
+    await state.set_state(WaterStates.waiting_for_room)
+    await message.answer(
+        "🚰 <b>Suv olib kelish navbatini qayd etish</b>\n\n"
+        "Qaysi xona baki uchun suv keltirildi?",
+        reply_markup=build_water_room_keyboard(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("water_room:"))
+async def callback_select_water_room(callback: CallbackQuery, state: FSMContext):
+    room_id = int(callback.data.split(":")[1])
+    users = await UserRepository.get_users_by_room(room_id)
+    keyboard = build_water_bringer_keyboard(users, room_id)
+
+    await state.set_state(WaterStates.waiting_for_bringer)
+    await state.update_data(room_id=room_id)
 
     await callback.message.edit_text(
-        f"📸 <b>Rasm isboti kutilmoqda...</b>\n\n"
-        f"Tanlandi: <b>{bringer['name']}</b>\n"
-        f"Iltimos, idishlar va suv rasm proof ini (Foto) ushbu chatga yuboring:",
+        f"🚰 <b>{room_id}-Xona Baki: Suv keltirish</b>\n\n"
+        f"Suvni kim olib keldi? Quyidagi ro'yxatdan tanlang:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "water_back_room")
+async def callback_water_back_room(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(WaterStates.waiting_for_room)
+    await callback.message.edit_text(
+        "🚰 <b>Suv olib kelish navbatini qayd etish</b>\n\n"
+        "Qaysi xona baki uchun suv keltirildi?",
+        reply_markup=build_water_room_keyboard(),
         parse_mode="HTML"
     )
 
@@ -50,9 +92,33 @@ async def callback_cancel_water(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("❌ Suv olib kelish operatsiyasi bekor qilindi.")
 
 
+@router.callback_query(F.data.startswith("water_bringer:"))
+async def callback_select_water_bringer(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split(":")
+    room_id = int(parts[1])
+    bringer_id = int(parts[2])
+
+    bringer = await UserRepository.get_user_by_id(bringer_id)
+    if not bringer:
+        await callback.answer("Foydalanuvchi topilmadi!", show_alert=True)
+        return
+
+    await state.update_data(room_id=room_id, bringer_id=bringer_id)
+    await state.set_state(WaterStates.waiting_for_photo_proof)
+
+    await callback.message.edit_text(
+        f"📸 <b>Rasm isboti kutilmoqda...</b>\n\n"
+        f"🏠 <b>Xona:</b> {room_id}-xona baki\n"
+        f"👤 <b>Keltiruvchi:</b> {bringer['name']}\n\n"
+        f"Iltimos, keltirilgan suv idishi (bak) rasm proof ini (Foto) ushbu bot chatiga yuboring:",
+        parse_mode="HTML"
+    )
+
+
 @router.message(WaterStates.waiting_for_photo_proof, F.photo)
-async def process_water_photo(message: Message, state: FSMContext):
+async def process_water_photo(message: Message, state: FSMContext, bot: Bot):
     data = await state.get_data()
+    room_id = data.get("room_id", 1)
     bringer_id = data.get("bringer_id")
 
     if not bringer_id:
@@ -61,7 +127,7 @@ async def process_water_photo(message: Message, state: FSMContext):
         return
 
     photo_file_id = message.photo[-1].file_id
-    result = await QueueService.record_water_delivery(bringer_id, photo_file_id)
+    result = await QueueService.record_room_water_delivery(room_id, bringer_id, photo_file_id)
 
     brought_by = result["brought_by"]
     next_user = result["next_user"]
@@ -70,18 +136,36 @@ async def process_water_photo(message: Message, state: FSMContext):
     if next_user.get("telegram_id"):
         next_tag = f"<a href='tg://user?id={next_user['telegram_id']}'>{next_user['name']}</a>"
 
-    caption = (
-        f"✅ <b>SUV KELTIRILGANI TASDIQLANDI!</b> 🚰\n\n"
-        f"👤 <b>Suv olib keldi:</b> {brought_by['name']} (Xona {brought_by['room_number']})\n"
-        f"➡️ <b>Keyingi suv navbati:</b> {next_tag}\n\n"
-        f"Baraka topsin! Keyingi navbatdagi xonadoshimiz tayyor tursin! 👍"
-    )
-
+    # Confirmation to user in PM
     await message.answer_photo(
         photo=photo_file_id,
-        caption=caption,
+        caption=(
+            f"✅ <b>{room_id}-XONA BAKI: SUV QAYD ETILDI!</b> 🚰\n\n"
+            f"👤 <b>Keltirdi:</b> {brought_by['name']}\n"
+            f"➡️ <b>Keyingi navbatchi:</b> {next_tag}\n\n"
+            f"Guruhga xabar yuborildi. Rahmat! 👍"
+        ),
         parse_mode="HTML"
     )
+
+    # Post exactly ONE clean notification to the main group chat
+    group_caption = (
+        f"✅ <b>{room_id}-XONA BAKI: SUV KELTIRILDI!</b> 🚰\n\n"
+        f"👤 <b>Suv olib keldi:</b> {brought_by['name']} (Xona {room_id})\n"
+        f"➡️ <b>Keyingi navbatdagi:</b> {next_tag}\n\n"
+        f"Baraka topsin! Navbatdagi xonadoshimiz tayyor tursin! 💧👏"
+    )
+
+    try:
+        await bot.send_photo(
+            chat_id=settings.GROUP_CHAT_ID,
+            photo=photo_file_id,
+            caption=group_caption,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        pass
+
     await state.clear()
 
 

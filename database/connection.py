@@ -46,9 +46,10 @@ async def init_db():
                 )
             await db.commit()
 
-        # Seed initial water state if empty
-        cursor = await db.execute("SELECT COUNT(*) as count FROM water_state")
-        row = await cursor.fetchone()
-        if row and row["count"] == 0:
-            await db.execute("INSERT INTO water_state (id, current_user_index) VALUES (1, 0)")
-            await db.commit()
+        # Seed initial dual-room water states (Room 1 and Room 2)
+        for room_id in (1, 2):
+            cursor = await db.execute("SELECT COUNT(*) as count FROM room_water_state WHERE room_id = ?", (room_id,))
+            row = await cursor.fetchone()
+            if row and row["count"] == 0:
+                await db.execute("INSERT INTO room_water_state (room_id, current_user_index) VALUES (?, 0)", (room_id,))
+        await db.commit()

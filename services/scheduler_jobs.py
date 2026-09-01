@@ -14,17 +14,27 @@ async def send_morning_brief(bot: Bot):
 
     daily_users = await QueueService.get_daily_duty(today)
     laundry_users = await QueueService.get_laundry_duty(today)
-    curr_water_user, _, _ = await QueueService.get_water_duty_info()
+    r1_water_user, _, _ = await QueueService.get_room_water_duty_info(1)
+    r2_water_user, _, _ = await QueueService.get_room_water_duty_info(2)
+    active_pair_info = await QueueService.get_active_weekly_pair(today)
 
-    daily_names = ", ".join([f"<b>{u['name']}</b>" + (f" (@{u['telegram_id']})" if u['telegram_id'] else "") for u in daily_users])
+    daily_names = ", ".join([f"<b>{u['name']}</b>" for u in daily_users])
     laundry_names = ", ".join([f"<b>{u['name']}</b>" for u in laundry_users])
-    water_name = f"<b>{curr_water_user['name']}</b>" if curr_water_user else "Noma'lum"
+    r1_water_name = f"<b>{r1_water_user['name']}</b>" if r1_water_user else "Noma'lum"
+    r2_water_name = f"<b>{r2_water_user['name']}</b>" if r2_water_user else "Noma'lum"
+
+    m1_name = active_pair_info['member1']['name'] if active_pair_info['member1'] else "?"
+    m2_name = active_pair_info['member2']['name'] if active_pair_info['member2'] else "?"
+    pair_str = f"<b>{m1_name} & {m2_name}</b> ({active_pair_info['week_number_in_month']}-hafta)"
 
     text = (
         f"☀️ <b>Kvartira Bot — Bugungi kunlik brifing</b> ({today_str})\n\n"
         f"👨‍🍳 <b>Kunning navbatchisi:</b> {daily_names}\n"
         f"🧺 <b>Kir yuvish navbati:</b> {laundry_names}\n"
-        f"🚰 <b>Suv olib kelish navbati:</b> {water_name}\n\n"
+        f"🚰 <b>Suv navbati:</b>\n"
+        f"   • 🏠 1-Xona baki: {r1_water_name}\n"
+        f"   • 🚪 2-Xona baki: {r2_water_name}\n"
+        f"👥 <b>Haftalik mas'ul juftlik (Bozorlik & Uborqa):</b> {pair_str}\n\n"
         f"📋 <b>Vazifalar ro'yxati (Tugmalarni bosib belgilang):</b>"
     )
 
@@ -77,12 +87,14 @@ async def send_sunday_deep_clean_brief(bot: Bot):
         return
 
     today_str = today.strftime("%Y-%m-%d")
-    pair_users = await QueueService.get_sunday_deep_clean_pair(today)
-    pair_names = " & ".join([f"<b>{u['name']}</b>" for u in pair_users])
+    pair_info = await QueueService.get_active_weekly_pair(today)
+    m1_name = pair_info['member1']['name'] if pair_info['member1'] else "?"
+    m2_name = pair_info['member2']['name'] if pair_info['member2'] else "?"
+    pair_names = f"<b>{m1_name} & {m2_name}</b> ({pair_info['week_number_in_month']}-hafta)"
 
     text = (
         f"🧹 <b>YAKSHANBALIK GENERAL UBORQA (09:00)</b> 🧹\n\n"
-        f"Bugungi general tozalik juftligi: {pair_names}\n\n"
+        f"Bugungi general tozalik mas'ullari: {pair_names}\n\n"
         f"Iltimos, uborqa yakunlangach quyidagi 11 ta nazorat punktini belgilab chiqing:"
     )
 

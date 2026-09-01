@@ -4,8 +4,9 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from config import settings
 from services.queue_service import QueueService
-from database.repositories import TaskRepository, DeepCleanRepository, UserRepository
+from database.repositories import TaskRepository, DeepCleanRepository
 from keyboards.inline import build_task_checklist_keyboard, build_deep_clean_keyboard, TASK_LABELS, DEEP_CLEAN_LABELS
+from utils.cleanup import safe_delete, delete_after
 
 router = Router()
 
@@ -13,22 +14,36 @@ router = Router()
 @router.message(Command("bugun"))
 @router.message(F.text == "📋 Bugungi navbatchilik")
 async def cmd_today_duty(message: Message):
+    is_group = message.chat.type in ("group", "supergroup")
+    if is_group:
+        await safe_delete(message)
+
     today = datetime.now(settings.timezone).date()
     today_str = today.strftime("%Y-%m-%d")
 
     daily_users = await QueueService.get_daily_duty(today)
     laundry_users = await QueueService.get_laundry_duty(today)
-    curr_water_user, _, _ = await QueueService.get_water_duty_info()
+    r1_water_user, _, _ = await QueueService.get_room_water_duty_info(1)
+    r2_water_user, _, _ = await QueueService.get_room_water_duty_info(2)
+    active_pair_info = await QueueService.get_active_weekly_pair(today)
 
     daily_names = ", ".join([f"<b>{u['name']}</b>" for u in daily_users])
     laundry_names = ", ".join([f"<b>{u['name']}</b>" for u in laundry_users])
-    water_name = f"<b>{curr_water_user['name']}</b>" if curr_water_user else "Noma'lum"
+    r1_water_name = f"<b>{r1_water_user['name']}</b>" if r1_water_user else "Noma'lum"
+    r2_water_name = f"<b>{r2_water_user['name']}</b>" if r2_water_user else "Noma'lum"
+
+    m1_name = active_pair_info['member1']['name'] if active_pair_info['member1'] else "?"
+    m2_name = active_pair_info['member2']['name'] if active_pair_info['member2'] else "?"
+    pair_str = f"<b>{m1_name} & {m2_name}</b> ({active_pair_info['week_number_in_month']}-hafta)"
 
     text = (
         f"☀️ <b>Kvartira Bot — Bugungi kunlik brifing</b> ({today_str})\n\n"
         f"👨‍🍳 <b>Kunning navbatchisi:</b> {daily_names}\n"
         f"🧺 <b>Kir yuvish navbati:</b> {laundry_names}\n"
-        f"🚰 <b>Suv olib kelish navbati:</b> {water_name}\n\n"
+        f"🚰 <b>Suv navbati:</b>\n"
+        f"   • 🏠 1-Xona baki: {r1_water_name}\n"
+        f"   • 🚪 2-Xona baki: {r2_water_name}\n"
+        f"👥 <b>Haftalik mas'ul juftlik (Bozorlik & Uborqa):</b> {pair_str}\n\n"
         f"📋 <b>Vazifalar ro'yxati (Tugmalarni bosib belgilang):</b>"
     )
 
@@ -36,6 +51,29 @@ async def cmd_today_duty(message: Message):
     keyboard = build_task_checklist_keyboard(today_str, tasks)
 
     await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.message(Command("hafta"))
+async def cmd_week_pair(message: Message):
+    is_group = message.chat.type in ("group", "supergroup")
+    if is_group:
+        await safe_delete(message)
+
+    today = datetime.now(settings.timezone).date()
+    pair_info = await QueueService.get_active_weekly_pair(today)
+    m1_name = pair_info['member1']['name'] if pair_info['member1'] else "?"
+    m2_name = pair_info['member2']['name'] if pair_info['member2'] else "?"
+
+    text = (
+        f"👥 <b>OYNING {pair_info['week_number_in_month']}-HAFTALIK JUFTLIGI</b>\n\n"
+        f"• <b>Mas'ul juftlik:</b> <b>{m1_name} & {m2_name}</b> (Juftlik #{pair_info['pair_id']})\n"
+        f"• <b>Vazifalar:</b> Haftalik umumiy bozorlik qilish + Yakshanbalik general tozalik (uborqa).\n"
+        f"• <b>Holat:</b> {'(Almashuv orqali belgilangan)' if pair_info['is_overridden'] else '(Standart reja)'}"
+    )
+
+    msg = await message.answer(text, parse_mode="HTML")
+    if is_group:
+        await delete_after(msg, 45)
 
 
 @router.callback_query(F.data.startswith("task_toggle:"))
@@ -51,11 +89,11 @@ async def callback_toggle_task(callback: CallbackQuery, current_user: dict):
     all_completed = result["all_completed"]
 
     task_name = TASK_LABELS.get(task_key, task_key)
-    state_str = "bajarildi deb belgilandi ✅" if new_state else "bekor qilindi ❌"
+    state_str = "bajarildi ✅" if new_state else "bekor qilindi ❌"
 
     await callback.answer(f"'{task_name}' {state_str}")
 
-    # Update inline keyboard dynamically
+    # Single-message pattern: in-place keyboard update
     new_keyboard = build_task_checklist_keyboard(log_date, result["tasks"])
     await callback.message.edit_reply_markup(reply_markup=new_keyboard)
 
@@ -63,11 +101,10 @@ async def callback_toggle_task(callback: CallbackQuery, current_user: dict):
     if all_completed and new_state:
         completed_by_name = current_user["name"] if current_user else callback.from_user.full_name
         celebration_text = (
-            f"🎉 <b>BARCHA VAZIFALAR BAJARILDI!</b> 🎉\n\n"
-            f"Hurmatli xonadoshlar, bugungi ({log_date}) barcha 4 ta kunlik vazifalar "
-            f"muvaffaqiyatli yakunlandi!\n"
+            f"🎉 <b>BARCHA KUNLIK VAZIFALAR BAJARILDI!</b> 🎉\n\n"
+            f"Bugungi ({log_date}) 4 ta kunlik vazifaning barchasi yakunlandi!\n"
             f"Oxirgi vazifani belgiladi: <b>{completed_by_name}</b>.\n"
-            f"Katta rahmat! Oila a'zolarimizga halovat va tozalik tilaymiz! ✨👏"
+            f"Katta rahmat! Xonadonga fayz va tozalik tilaymiz! ✨👏"
         )
         await callback.message.answer(celebration_text, parse_mode="HTML")
 
@@ -95,6 +132,6 @@ async def callback_toggle_deep_clean(callback: CallbackQuery, current_user: dict
     if all_completed and new_state:
         celebration_text = (
             f"✨ <b>YAKSHANBALIK GENERAL UBORQA MUVAFFAQIYATLI YAKUNLANDI!</b> ✨\n\n"
-            f"Barcha 11 ta nazorat punktlari to'liq bajariib chiqildi. Baraka topsin navbatchilar! 🧹👏"
+            f"Barcha 11 ta nazorat punktlari to'liq bajarib chiqildi. Baraka topsin navbatchilar! 🧹👏"
         )
         await callback.message.answer(celebration_text, parse_mode="HTML")

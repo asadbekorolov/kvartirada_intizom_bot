@@ -1,22 +1,47 @@
-from aiogram import Router, F
-from aiogram.filters import CommandStart, Command
+from aiogram import Router, F, Bot
+from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from database.repositories import UserRepository
 from keyboards.reply import main_menu_keyboard
+from utils.cleanup import safe_delete, delete_after
 
 router = Router()
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, current_user: dict):
-    tg_id = message.from_user.id
-    name = message.from_user.full_name
+async def cmd_start(message: Message, command: CommandObject, current_user: dict, bot: Bot):
+    if message.chat.type in ("group", "supergroup"):
+        await safe_delete(message)
+        me = await bot.get_me()
+        btn = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="💬 Botga o'tish (PM)", url=f"https://t.me/{me.username}?start=help")
+        ]])
+        msg = await message.answer("ℹ️ Bot bilan ishlash uchun shaxsiy xabarga (PM) o'ting:", reply_markup=btn)
+        await delete_after(msg, 30)
+        return
 
+    payload = command.args if command else None
+
+    # Handle Deep Links
+    if payload == "water_r1":
+        from handlers.water import start_water_flow_for_room
+        await start_water_flow_for_room(message, room_id=1)
+        return
+    elif payload == "water_r2":
+        from handlers.water import start_water_flow_for_room
+        await start_water_flow_for_room(message, room_id=2)
+        return
+    elif payload == "swap":
+        from handlers.swap import start_swap_flow_pm
+        await start_swap_flow_pm(message, current_user)
+        return
+
+    name = message.from_user.full_name
     text = (
         f"👋 <b>Assalomu alaykum, {name}!</b>\n\n"
         f"🏢 <b>Kvartira Bot</b> tizimiga xush kelibsiz!\n"
         f"Ushbu bot 8 kishilik xonadonimizdagi kunlik navbatchilik, kir yuvish, "
-        f"suv keltirish va general uborqa jarayonlarini avtomatlashtirish uchun xizmat qiladi.\n\n"
+        f"2 ta xona baki suvini keltirish, bozorlik va general uborqa jarayonlarini boshqaradi.\n\n"
     )
 
     if current_user:
@@ -63,16 +88,25 @@ async def callback_claim_user(callback: CallbackQuery):
 @router.message(Command("help"))
 @router.message(F.text == "ℹ️ Yordam")
 async def cmd_help(message: Message):
+    is_group = message.chat.type in ("group", "supergroup")
+    if is_group:
+        await safe_delete(message)
+
     text = (
-        "ℹ️ <b>KVARTIRA BOT — YO'RIQNOMA VA BUYRUQLAR</b>\n\n"
-        "<b>📱 Asosiy Tugmalar:</b>\n"
-        "• 📋 <b>Bugungi navbatchilik:</b> Bugungi kunlik navbatchi, kir yuvish va suv navbatini ko'rish hamda vazifalarni belgilash.\n"
-        "• 🚰 <b>Suv olib keldim:</b> Suv keltirganda rasm isbotini yuborib navbatni keyingi kishiga o'tkazish.\n"
-        "• 🔄 <b>Navbat almashish:</b> Kunlik navbatchilikni boshqa xonadosh bilan almashish so'rovini yuborish.\n\n"
-        "<b>⚙️ Admin Buyruqlari (Faqat adminlar uchun):</b>\n"
-        "• <code>/suv_admin &lt;user_id&gt;</code> - Suv navbatini ko'rsatilgan kishiga majburiy o'tkazish (1..8).\n"
-        "• <code>/almash_admin &lt;day_idx&gt; &lt;user_ids&gt;</code> - Kunlik navbatchilikni majburiy o'zgartirish (masalan: <code>/almash_admin 0 2</code>).\n"
-        "• <code>/reset_tasks</code> - Bugungi vazifalar holatini qayta tiklash.\n"
-        "• <code>/bind_admin &lt;user_id&gt; &lt;telegram_id&gt;</code> - Profilni Telegram ID ga majburiy bog'lash.\n"
+        "ℹ️ <b>KVARTIRA BOT — YO'RIQNOMA VA QOIDALAR</b>\n\n"
+        "<b>🚰 Suv Navbati (2 ta Alohida Bak):</b>\n"
+        "• 🏠 <b>1-Xona Baki:</b> Avazbek ➔ Firdavs ➔ Asadbek bro ➔ Omadbek\n"
+        "• 🚪 <b>2-Xona Baki:</b> Ilyosbek ➔ Jaloliddin ➔ Asadbek ➔ Mavlonbek\n"
+        "<i>(Suv keltirilgach rasm proof yuboriladi va navbat aylanadi.)</i>\n\n"
+        "<b>👥 Oylik 4-Haftalik Juftliklar (Uborqa & Bozorlik):</b>\n"
+        "• 1-hafta (1–7 kunlar): Omadbek & Asadbek bro\n"
+        "• 2-hafta (8–14 kunlar): Ilyosbek & Jaloliddin\n"
+        "• 3-hafta (15–21 kunlar): Avazbek & Firdavs\n"
+        "• 4-hafta (22–oy oxiri): Mavlonbek & Asadbek\n\n"
+        "<b>🔄 Navbat Almashish (/almashish):</b>\n"
+        "• Kunlik navbatchilik, butun haftalik juftlik yoki juftlik ichida alohida o'rinbosar almashish imkoniyati.\n"
     )
-    await message.answer(text, parse_mode="HTML")
+    
+    msg = await message.answer(text, parse_mode="HTML")
+    if is_group:
+        await delete_after(msg, 45)
