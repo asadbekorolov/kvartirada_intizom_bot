@@ -75,8 +75,10 @@ async def cmd_start(message: Message, command: CommandObject, current_user: dict
 
 @router.message(Command("unbind"))
 @router.message(Command("qayta_tanlash"))
+@router.message(F.text == "🔄 Profilni qayta tanlash / Unbind")
 async def cmd_unbind(message: Message):
     is_group = message.chat.type in ("group", "supergroup")
+
     if is_group:
         await safe_delete(message)
 

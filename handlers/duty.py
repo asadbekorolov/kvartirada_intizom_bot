@@ -54,26 +54,46 @@ async def cmd_today_duty(message: Message):
 
 
 @router.message(Command("hafta"))
+@router.message(F.text == "🗓 Haftalik navbatchilik (Bozorlik)")
 async def cmd_week_pair(message: Message):
     is_group = message.chat.type in ("group", "supergroup")
     if is_group:
         await safe_delete(message)
 
     today = datetime.now(settings.timezone).date()
-    pair_info = await QueueService.get_active_weekly_pair(today)
-    m1_name = pair_info['member1']['name'] if pair_info['member1'] else "?"
-    m2_name = pair_info['member2']['name'] if pair_info['member2'] else "?"
+    curr_week_idx = QueueService.get_month_week_index(today)
+    active_pair_info = await QueueService.get_active_weekly_pair(today)
+
+    m1_active = active_pair_info['member1']['name'] if active_pair_info['member1'] else "?"
+    m2_active = active_pair_info['member2']['name'] if active_pair_info['member2'] else "?"
 
     text = (
-        f"👥 <b>OYNING {pair_info['week_number_in_month']}-HAFTALIK JUFTLIGI</b>\n\n"
-        f"• <b>Mas'ul juftlik:</b> <b>{m1_name} & {m2_name}</b> (Juftlik #{pair_info['pair_id']})\n"
-        f"• <b>Vazifalar:</b> Haftalik umumiy bozorlik qilish + Yakshanbalik general tozalik (uborqa).\n"
-        f"• <b>Holat:</b> {'(Almashuv orqali belgilangan)' if pair_info['is_overridden'] else '(Standart reja)'}"
+        f"🗓 <b>HAFTALIK NAVBATCHILIK VA BOZORLIK REJASI</b>\n\n"
+        f"🌟 <b>HOZIRGI FAOL HAFTA ({curr_week_idx + 1}-hafta):</b>\n"
+        f"👥 <b>Mas'ul juftlik:</b> <b>{m1_active} & {m2_active}</b>\n"
+        f"🛒 <b>Vazifalar:</b> Umumiy bozorlik qilish + Yakshanbalik general uborqa\n"
+        f"📌 <b>Holat:</b> {'🔄 (Almashuv kiritilgan)' if active_pair_info['is_overridden'] else '✅ (Standart reja)'}\n\n"
+        f"📋 <b>OYLIK TO'LIQ ROTATSIYA JADVALI:</b>\n"
     )
+
+    from services.queue_service import MONTH_WEEK_NAMES
+    for w_idx in range(4):
+        sample_day = min(w_idx * 7 + 1, 28)
+        sample_date = date(today.year, today.month, sample_day)
+        p_info = await QueueService.get_active_weekly_pair(sample_date)
+        m1 = p_info['member1']['name'] if p_info['member1'] else "?"
+        m2 = p_info['member2']['name'] if p_info['member2'] else "?"
+        
+        prefix = "➡️" if w_idx == curr_week_idx else "•"
+        tag = " <i>(Hozirgi faol)</i>" if w_idx == curr_week_idx else ""
+        override_tag = " 🔄" if p_info['is_overridden'] else ""
+        
+        text += f"{prefix} <b>{MONTH_WEEK_NAMES[w_idx]}:</b> {m1} & {m2}{override_tag}{tag}\n"
 
     msg = await message.answer(text, parse_mode="HTML")
     if is_group:
-        await delete_after(msg, 45)
+        await delete_after(msg, 60)
+
 
 
 @router.callback_query(F.data.startswith("task_toggle:"))
