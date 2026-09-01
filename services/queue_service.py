@@ -45,6 +45,8 @@ MONTHLY_DEFAULT_PAIRS = {
 }
 
 DAY_NAMES = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
+MONTH_WEEK_NAMES = ["1-hafta (1–7 kunlar)", "2-hafta (8–14 kunlar)", "3-hafta (15–21 kunlar)", "4-hafta (22–oy oxiri)"]
+
 
 
 class QueueService:
