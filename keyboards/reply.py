@@ -2,7 +2,7 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.types import ReplyKeyboardMarkup
 
 
-def main_menu_keyboard() -> ReplyKeyboardMarkup:
+def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     # Row 1
     builder.button(text="📋 Bugungi navbatchilik")
@@ -15,3 +15,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     builder.button(text="ℹ️ Yordam")
     builder.adjust(2, 2, 2)
     return builder.as_markup(resize_keyboard=True)
+
+
+# Backward compatibility alias
+main_menu_keyboard = get_main_reply_keyboard

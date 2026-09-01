@@ -2,7 +2,7 @@ from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from database.repositories import UserRepository
-from keyboards.reply import main_menu_keyboard
+from keyboards.reply import get_main_reply_keyboard
 from utils.cleanup import safe_delete, delete_after
 
 router = Router()
@@ -61,14 +61,16 @@ async def cmd_start(message: Message, command: CommandObject, current_user: dict
         reselect_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🔄 Profilni qayta tanlash / Unbind", callback_data="reselect_profile")
         ]])
-        await message.answer(text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
+        await message.answer(text, reply_markup=get_main_reply_keyboard(), parse_mode="HTML")
         await message.answer("Agar profilingiz xato tanlangan bo'lsa, quyidagi tugmani bosing:", reply_markup=reselect_kb)
     else:
         text += "⚠️ Sizning Telegram hisobingiz hali xonadondagi profilingizga bog'lanmagan. Iltimos, ismingizni tanlang:"
         kb = await get_claim_keyboard()
+        # Always send bottom reply keyboard first to refresh client UI
+        await message.answer("Quyidagi menyu orqali bot imkoniyatlaridan foydalanishingiz mumkin:", reply_markup=get_main_reply_keyboard())
         if not kb.inline_keyboard:
             text += "\n\n(Barcha 8 ta profil bog'lab bo'lingan. Admin yordamida o'zgartirishingiz mumkin.)"
-            await message.answer(text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
+            await message.answer(text, parse_mode="HTML")
         else:
             await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
@@ -90,15 +92,19 @@ async def cmd_unbind(message: Message):
         "Iltimos, o'zingizga tegishli haqiqiy profilingizni tanlang:"
     )
 
-    msg = await message.answer(text, reply_markup=kb, parse_mode="HTML")
     if is_group:
+        msg = await message.answer(text, reply_markup=kb, parse_mode="HTML")
         await delete_after(msg, 45)
+    else:
+        await message.answer("Menyu yangilandi:", reply_markup=get_main_reply_keyboard())
+        await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 
 @router.callback_query(F.data == "reselect_profile")
 async def callback_reselect_profile(callback: CallbackQuery):
     await UserRepository.unbind_user_by_telegram_id(callback.from_user.id)
     kb = await get_claim_keyboard()
+    await callback.message.answer("Menyu yangilandi:", reply_markup=get_main_reply_keyboard())
     await callback.message.edit_text(
         "🔄 <b>Profilingiz uzildi.</b>\n\nIltimos, o'zingizning haqiqiy profilingizni tanlang:",
         reply_markup=kb,
@@ -125,10 +131,10 @@ async def callback_claim_user(callback: CallbackQuery):
     await UserRepository.bind_telegram_id(user_id, tg_id)
     
     await callback.message.edit_text(
-        f"🎉 Tabriklaymiz! Siz muvaffaqiyatli <b>{user['name']}</b> (Xona {user['room_number']}) profili bilan bog'landindingiz!",
+        f"🎉 Tabriklaymiz! Siz muvaffaqiyatli <b>{user['name']}</b> (Xona {user['room_number']}) profili bilan bog'landingiz!",
         parse_mode="HTML"
     )
-    await callback.message.answer("Asosiy menyu:", reply_markup=main_menu_keyboard())
+    await callback.message.answer("Asosiy menyu faollashtirildi:", reply_markup=get_main_reply_keyboard())
 
 
 @router.message(Command("help"))
@@ -155,6 +161,8 @@ async def cmd_help(message: Message):
         "• <code>/unbind</code> yoki <code>/qayta_tanlash</code> - Profilingizni bekor qilib yangitdan tanlash.\n"
     )
     
-    msg = await message.answer(text, parse_mode="HTML")
     if is_group:
+        msg = await message.answer(text, parse_mode="HTML")
         await delete_after(msg, 45)
+    else:
+        await message.answer(text, reply_markup=get_main_reply_keyboard(), parse_mode="HTML")
