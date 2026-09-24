@@ -36,10 +36,10 @@ DEFAULT_LAUNDRY_DUTY = {
 
 # Monthly 4-Week Rotating Pairs (Bozorlik & General Uborqa) - Omadbek excluded
 MONTHLY_DEFAULT_PAIRS = {
-    0: (1, 3, 6),  # 1-hafta (1–7 kunlar): Juftlik #1 -> Asadbek bro (3) & Jaloliddin (6)
+    0: (1, 3, 1),  # 1-hafta (1–7 kunlar): Juftlik #1 -> Asadbek bro (3) & Avazbek (1)
     1: (2, 1, 2),  # 2-hafta (8–14 kunlar): Juftlik #2 -> Avazbek (1) & Firdavs (2)
     2: (3, 8, 7),  # 3-hafta (15–21 kunlar): Juftlik #3 -> Mavlonbek (8) & Asadbek (7)
-    3: (4, 5, 3)   # 4-hafta (22–oy oxiri): Juftlik #4 -> Ilyosbek (5) & Asadbek bro (3)
+    3: (4, 5, 6)   # 4-hafta (22–oy oxiri): Juftlik #4 -> Ilyosbek (5) & Jaloliddin (6)
 }
 
 

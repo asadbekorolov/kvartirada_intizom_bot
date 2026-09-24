@@ -43,10 +43,10 @@ A production-ready, modular, and resilient Telegram bot built with **aiogram 3.x
 * **Yakshanba:** Mavlonbek (8)
 
 ### 👥 Oylik 4-Haftalik Juftliklar (Bozorlik & General Uborqa):
-* **1-hafta (1–7 kunlar):** Asadbek bro (3) & Jaloliddin (6)
+* **1-hafta (1–7 kunlar):** Asadbek bro (3) & Avazbek (1)
 * **2-hafta (8–14 kunlar):** Avazbek (1) & Firdavs (2)
 * **3-hafta (15–21 kunlar):** Mavlonbek (8) & Asadbek (7)
-* **4-hafta (22–oy oxiri):** Ilyosbek (5) & Asadbek bro (3)
+* **4-hafta (22–oy oxiri):** Ilyosbek (5) & Jaloliddin (6)
 
 ---
 

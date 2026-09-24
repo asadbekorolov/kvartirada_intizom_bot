@@ -87,11 +87,11 @@ async def run_tests():
     print(f"✅ Room 2 Delivery OK: Next is {rec2['next_user']['name']}")
 
     print("\n3. Testing Monthly 4-Week Pair Rotation...")
-    # Day 1..7 -> Week 1 (Pair 1: Asadbek bro & Jaloliddin)
+    # Day 1..7 -> Week 1 (Pair 1: Asadbek bro & Avazbek)
     d_w1 = date(2026, 9, 3)
     p_w1 = await QueueService.get_active_weekly_pair(d_w1)
     assert p_w1["week_index"] == 0 and p_w1["pair_id"] == 1
-    assert p_w1["member1"]["id"] == 3 and p_w1["member2"]["id"] == 6
+    assert p_w1["member1"]["id"] == 3 and p_w1["member2"]["id"] == 1
     print(f"✅ Week 1 (Day 3) Pair OK: {p_w1['member1']['name']} & {p_w1['member2']['name']}")
 
     # Day 8..14 -> Week 2 (Pair 2: Avazbek & Firdavs)
@@ -108,11 +108,11 @@ async def run_tests():
     assert p_w3["member1"]["id"] == 8 and p_w3["member2"]["id"] == 7
     print(f"✅ Week 3 (Day 17) Pair OK: {p_w3['member1']['name']} & {p_w3['member2']['name']}")
 
-    # Day 22..30 -> Week 4 (Pair 4: Ilyosbek & Asadbek bro)
+    # Day 22..30 -> Week 4 (Pair 4: Ilyosbek & Jaloliddin)
     d_w4 = date(2026, 9, 28)
     p_w4 = await QueueService.get_active_weekly_pair(d_w4)
     assert p_w4["week_index"] == 3 and p_w4["pair_id"] == 4
-    assert p_w4["member1"]["id"] == 5 and p_w4["member2"]["id"] == 3
+    assert p_w4["member1"]["id"] == 5 and p_w4["member2"]["id"] == 6
     print(f"✅ Week 4 (Day 28) Pair OK: {p_w4['member1']['name']} & {p_w4['member2']['name']}")
 
     print("\n4. Testing Daily Duty Schedule & Advanced Swapping Engines...")
