@@ -47,9 +47,10 @@ async def init_db():
             await db.commit()
 
         # Seed initial dual-room water states (Room 1 and Room 2)
+        # Index 1 corresponds to next in line (Room 1: Firdavs after Avazbek; Room 2: Jaloliddin after Asadbek)
         for room_id in (1, 2):
             cursor = await db.execute("SELECT COUNT(*) as count FROM room_water_state WHERE room_id = ?", (room_id,))
             row = await cursor.fetchone()
             if row and row["count"] == 0:
-                await db.execute("INSERT INTO room_water_state (room_id, current_user_index) VALUES (?, 0)", (room_id,))
+                await db.execute("INSERT INTO room_water_state (room_id, current_user_index) VALUES (?, 1)", (room_id,))
         await db.commit()

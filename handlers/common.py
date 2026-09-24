@@ -14,6 +14,8 @@ async def get_claim_keyboard() -> InlineKeyboardMarkup:
     users = await UserRepository.get_all_users()
     buttons = []
     for u in users:
+        if u["id"] == 4:  # Omadbek navbatchilikdan chiqarilgan
+            continue
         if not u.get("telegram_id"):
             buttons.append([InlineKeyboardButton(text=f"👤 Men {u['name']}man (Xona {u['room_number']})", callback_data=f"claim_user:{u['id']}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -206,15 +208,23 @@ async def cmd_help(message: Message):
 
     text = (
         "ℹ️ <b>KVARTIRA BOT — YO'RIQNOMA VA QOIDALAR</b>\n\n"
-        "<b>🚰 Suv Navbati (2 ta Alohida Bak):</b>\n"
-        "• 🏠 <b>1-Xona Baki:</b> Avazbek ➔ Firdavs ➔ Asadbek bro ➔ Omadbek\n"
-        "• 🚪 <b>2-Xona Baki:</b> Ilyosbek ➔ Jaloliddin ➔ Asadbek ➔ Mavlonbek\n"
+        "<b>📅 Kunlik Navbatchilik Tartibi:</b>\n"
+        "• Dushanba: Jaloliddin\n"
+        "• Seshanba: Asadbek bro\n"
+        "• Chorshanba: Asadbek (men)\n"
+        "• Payshanba: Firdavs\n"
+        "• Juma: Mavlonbek\n"
+        "• Shanba: Avazbek\n"
+        "• Yakshanba: Ilyosbek\n\n"
+        "<b>🚰 Suv Navbati Tartibi:</b>\n"
+        "• 🏠 <b>1-Xona (10L Baklashka):</b> Faqat Avazbek va Firdavs navbatma-navbat olib keladi.\n"
+        "• 🚪 <b>2-Xona (Baki):</b> Asadbek, Jaloliddin, Mavlonbek 2 martadan, Ilyosbek esa 1 marta olib keladi.\n"
         "<i>(Suv keltirilgach rasm proof yuboriladi va navbat aylanadi.)</i>\n\n"
         "<b>👥 Oylik 4-Haftalik Juftliklar (Uborqa & Bozorlik):</b>\n"
-        "• 1-hafta (1–7 kunlar): Omadbek & Asadbek bro\n"
-        "• 2-hafta (8–14 kunlar): Ilyosbek & Jaloliddin\n"
-        "• 3-hafta (15–21 kunlar): Avazbek & Firdavs\n"
-        "• 4-hafta (22–oy oxiri): Mavlonbek & Asadbek\n\n"
+        "• 1-hafta (1–7 kunlar): Asadbek bro & Jaloliddin\n"
+        "• 2-hafta (8–14 kunlar): Avazbek & Firdavs\n"
+        "• 3-hafta (15–21 kunlar): Mavlonbek & Asadbek\n"
+        "• 4-hafta (22–oy oxiri): Ilyosbek & Asadbek bro\n\n"
         "<b>🔄 Navbat Almashish (/almashish):</b>\n"
         "• Kunlik navbatchilik, butun haftalik juftlik yoki juftlik ichida alohida o'rinbosar almashish imkoniyati.\n\n"
         "<b>🔔 Guruh xabarlari:</b>\n"

@@ -44,11 +44,12 @@ def build_task_checklist_keyboard(log_date: str, tasks: Dict[str, Dict[str, Any]
 
 def build_water_room_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="🏠 1-Xona (Baki)", callback_data="water_room:1")
+    builder.button(text="🏠 1-Xona (10L Baklashka)", callback_data="water_room:1")
     builder.button(text="🚪 2-Xona (Baki)", callback_data="water_room:2")
     builder.button(text="❌ Bekor qilish", callback_data="water_cancel")
     builder.adjust(2, 1)
     return builder.as_markup()
+
 
 
 def build_water_bringer_keyboard(users: List[Dict[str, Any]], room_id: int) -> InlineKeyboardMarkup:
@@ -103,6 +104,8 @@ def build_swap_weeks_keyboard(current_week_idx: int) -> InlineKeyboardMarkup:
 def build_swap_users_keyboard(users: List[Dict[str, Any]], exclude_id: int = None, callback_prefix: str = "swap_user") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for u in users:
+        if u["id"] == 4:  # Omadbek navbatchilikdan chiqarilgan
+            continue
         if exclude_id and u["id"] == exclude_id:
             continue
         builder.button(

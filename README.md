@@ -10,43 +10,43 @@ A production-ready, modular, and resilient Telegram bot built with **aiogram 3.x
 1. **Avazbek** (ID 1)
 2. **Firdavs** (ID 2)
 3. **Asadbek bro** (ID 3)
-4. **Omadbek** (ID 4)
-* **Water Queue (1-Xona Baki):** `Avazbek ➔ Firdavs ➔ Asadbek bro ➔ Omadbek` (Circular)
+4. **Omadbek** (ID 4 - *navbatchilikdan chiqarilgan*)
+* **Water Queue (1-Xona 10L Baklashka):** `Avazbek ➔ Firdavs` (Faqat Avazbek va Firdavs ichadi va navbatma-navbat olib keladi)
 
 ### 🚪 2-Xona (Room 2):
 5. **Ilyosbek** (ID 5)
 6. **Jaloliddin** (ID 6)
 7. **Asadbek** (ID 7)
 8. **Mavlonbek** (ID 8)
-* **Water Queue (2-Xona Baki):** `Ilyosbek ➔ Jaloliddin ➔ Asadbek ➔ Mavlonbek` (Circular)
+* **Water Queue (2-Xona Baki):** `Asadbek ➔ Jaloliddin ➔ Mavlonbek ➔ Asadbek ➔ Jaloliddin ➔ Mavlonbek ➔ Ilyosbek` (Ilyosbek suv kam ichgani sababli har 2 siklda 1 marta, qolganlar 2 martadan olib keladi)
 
 ---
 
-## 🗓️ Default Rotations & Schedules
+## 🗓️ Yangilangan Navbatchilik Rejasi & Qoidalar
 
 ### 👨‍🍳 Kunlik Navbatchilik (`daily_duty`):
-* **Dushanba:** Jaloliddin (6)
-* **Seshanba:** Firdavs (2)
-* **Chorshanba:** Asadbek (7)
-* **Payshanba:** Asadbek bro (3)
-* **Juma:** Mavlonbek (8)
-* **Shanba:** Avazbek (1)
-* **Yakshanba:** Omadbek (4) & Ilyosbek (5)
+* **Dushanba:** Jaloliddin (ID 6)
+* **Seshanba:** Asadbek bro (ID 3)
+* **Chorshanba:** Asadbek (men) (ID 7)
+* **Payshanba:** Firdavs (ID 2)
+* **Juma:** Mavlonbek (ID 8)
+* **Shanba:** Avazbek (ID 1)
+* **Yakshanba:** Ilyosbek (ID 5)
 
 ### 🧺 Kir Yuvish Navbati (`laundry_duty`):
 * **Dushanba:** Firdavs (2) / Mavlonbek (8)
 * **Seshanba:** Jaloliddin (6)
 * **Chorshanba:** Asadbek bro (3)
-* **Payshanba:** Omadbek (4)
+* **Payshanba:** Ilyosbek (5)
 * **Juma:** Asadbek (7)
-* **Shanba:** Ilyosbek (5)
-* **Yakshanba:** Avazbek (1) / Mavlonbek (8)
+* **Shanba:** Avazbek (1)
+* **Yakshanba:** Mavlonbek (8)
 
 ### 👥 Oylik 4-Haftalik Juftliklar (Bozorlik & General Uborqa):
-* **1-hafta (1–7 kunlar):** Omadbek (4) & Asadbek bro (3)
-* **2-hafta (8–14 kunlar):** Ilyosbek (5) & Jaloliddin (6)
-* **3-hafta (15–21 kunlar):** Avazbek (1) & Firdavs (2)
-* **4-hafta (22–oy oxiri):** Mavlonbek (8) & Asadbek (7)
+* **1-hafta (1–7 kunlar):** Asadbek bro (3) & Jaloliddin (6)
+* **2-hafta (8–14 kunlar):** Avazbek (1) & Firdavs (2)
+* **3-hafta (15–21 kunlar):** Mavlonbek (8) & Asadbek (7)
+* **4-hafta (22–oy oxiri):** Ilyosbek (5) & Asadbek bro (3)
 
 ---
 

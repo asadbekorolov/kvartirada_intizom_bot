@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.fsm.context import FSMContext
 from states import WaterStates
 from config import settings
-from services.queue_service import QueueService
+from services.queue_service import QueueService, ROOM_1_WATER_QUEUE, ROOM_2_WATER_QUEUE
 from database.repositories import UserRepository
 from keyboards.inline import build_water_room_keyboard, build_water_bringer_keyboard
 from utils.cleanup import safe_delete, delete_after
@@ -15,12 +15,20 @@ router = Router()
 
 async def start_water_flow_for_room(message: Message, room_id: int, state: FSMContext = None):
     users = await UserRepository.get_users_by_room(room_id)
+    if room_id == 1:
+        # Only Avazbek (1) and Firdavs (2) drink and bring 10L water for Room 1
+        users = [u for u in users if u["id"] in ROOM_1_WATER_QUEUE]
+        room_title = "1-Xona (10L Baklashka)"
+    else:
+        users = [u for u in users if u["id"] in set(ROOM_2_WATER_QUEUE)]
+        room_title = "2-Xona Baki"
+
     keyboard = build_water_bringer_keyboard(users, room_id)
     if state:
         await state.set_state(WaterStates.waiting_for_bringer)
         await state.update_data(room_id=room_id)
     await message.answer(
-        f"🚰 <b>{room_id}-Xona Baki: Suv keltirish</b>\n\n"
+        f"🚰 <b>{room_title}: Suv keltirish</b>\n\n"
         f"Suvni kim olib keldi? Quyidagi ro'yxatdan tanlang:",
         reply_markup=keyboard,
         parse_mode="HTML"
@@ -36,7 +44,7 @@ async def cmd_water_start(message: Message, state: FSMContext, bot: Bot):
         me = await bot.get_me()
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🏠 1-Xona Suvi (PM)", url=f"https://t.me/{me.username}?start=water_r1"),
+                InlineKeyboardButton(text="🏠 1-Xona Suvi (10L PM)", url=f"https://t.me/{me.username}?start=water_r1"),
                 InlineKeyboardButton(text="🚪 2-Xona Suvi (PM)", url=f"https://t.me/{me.username}?start=water_r2"),
             ]
         ])
@@ -63,17 +71,25 @@ async def cmd_water_start(message: Message, state: FSMContext, bot: Bot):
 async def callback_select_water_room(callback: CallbackQuery, state: FSMContext):
     room_id = int(callback.data.split(":")[1])
     users = await UserRepository.get_users_by_room(room_id)
+    if room_id == 1:
+        users = [u for u in users if u["id"] in ROOM_1_WATER_QUEUE]
+        room_title = "1-Xona (10L Baklashka)"
+    else:
+        users = [u for u in users if u["id"] in set(ROOM_2_WATER_QUEUE)]
+        room_title = "2-Xona Baki"
+
     keyboard = build_water_bringer_keyboard(users, room_id)
 
     await state.set_state(WaterStates.waiting_for_bringer)
     await state.update_data(room_id=room_id)
 
     await callback.message.edit_text(
-        f"🚰 <b>{room_id}-Xona Baki: Suv keltirish</b>\n\n"
+        f"🚰 <b>{room_title}: Suv keltirish</b>\n\n"
         f"Suvni kim olib keldi? Quyidagi ro'yxatdan tanlang:",
         reply_markup=keyboard,
         parse_mode="HTML"
     )
+
 
 
 @router.callback_query(F.data == "water_back_room")

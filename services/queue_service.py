@@ -3,46 +3,45 @@ from typing import List, Dict, Any, Tuple
 from database.repositories import UserRepository, DutyRepository, WaterRepository
 
 
-# Dual-Room Independent Water Queues (4 flatmates per room)
-# Room 1: Avazbek (1), Firdavs (2), Asadbek bro (3), Omadbek (4)
-ROOM_1_WATER_QUEUE = [1, 2, 3, 4]
+# Dual-Room Independent Water Queues
+# Room 1 (10L Baklashka): Faqat Avazbek (1) va Firdavs (2) suv olib keladi
+ROOM_1_WATER_QUEUE = [1, 2]
 
-# Room 2: Ilyosbek (5), Jaloliddin (6), Asadbek (7), Mavlonbek (8)
-ROOM_2_WATER_QUEUE = [5, 6, 7, 8]
+# Room 2: Asadbek (7), Jaloliddin (6), Mavlonbek (8) har biri 2 martadan, Ilyosbek (5) 1 marta
+# Sequence: Asadbek, Jaloliddin, Mavlonbek, Asadbek, Jaloliddin, Mavlonbek, Ilyosbek (7 ta slot)
+ROOM_2_WATER_QUEUE = [7, 6, 8, 7, 6, 8, 5]
 
 # Default Daily Duty Rotations (0=Mon, 1=Tue, ..., 6=Sun)
+# Omadbek excluded per request
 DEFAULT_DAILY_DUTY = {
-    0: [6],       # Mon: Jaloliddin
-    1: [2],       # Tue: Firdavs
-    2: [7],       # Wed: Asadbek
-    3: [3],       # Thu: Asadbek bro
-    4: [8],       # Fri: Mavlonbek
-    5: [1],       # Sat: Avazbek
-    6: [4, 5]     # Sun: Omadbek & Ilyosbek
+    0: [6],       # Dushanba: Jaloliddin
+    1: [3],       # Seshanba: Asadbek bro
+    2: [7],       # Chorshanba: Asadbek (men)
+    3: [2],       # Payshanba: Firdavs
+    4: [8],       # Juma: Mavlonbek
+    5: [1],       # Shanba: Avazbek
+    6: [5]        # Yakshanba: Ilyosbek
 }
 
 # Default Laundry Duty Rotations (0=Mon, 1=Tue, ..., 6=Sun)
 DEFAULT_LAUNDRY_DUTY = {
-    0: [2, 8],    # Mon: Firdavs / Mavlonbek
-    1: [6],       # Tue: Jaloliddin
-    2: [3],       # Wed: Asadbek bro
-    3: [4],       # Thu: Omadbek
-    4: [7],       # Fri: Asadbek
-    5: [5],       # Sat: Ilyosbek
-    6: [1, 8]     # Sun: Avazbek / Mavlonbek
+    0: [2],       # Dushanba: Firdavs
+    1: [6],       # Seshanba: Jaloliddin
+    2: [3],       # Chorshanba: Asadbek bro
+    3: [1],       # Payshanba: Avazbek
+    4: [7],       # Juma: Asadbek
+    5: [5],       # Shanba: Ilyosbek
+    6: [8]        # Yakshanba: Mavlonbek
 }
 
-# Monthly 4-Week Rotating Pairs (for Deep Clean & Market Runs)
-# Week 1 (Days 1..7): Pair 1 -> Omadbek (4) & Asadbek bro (3)
-# Week 2 (Days 8..14): Pair 2 -> Ilyosbek (5) & Jaloliddin (6)
-# Week 3 (Days 15..21): Pair 3 -> Avazbek (1) & Firdavs (2)
-# Week 4 (Days 22..end): Pair 4 -> Mavlonbek (8) & Asadbek (7)
+# Monthly 4-Week Rotating Pairs (Bozorlik & General Uborqa) - Omadbek excluded
 MONTHLY_DEFAULT_PAIRS = {
-    0: (1, 4, 3),  # (Pair_ID, Member1_ID, Member2_ID)
-    1: (2, 5, 6),
-    2: (3, 1, 2),
-    3: (4, 8, 7)
+    0: (1, 3, 6),  # 1-hafta (1–7 kunlar): Juftlik #1 -> Asadbek bro (3) & Jaloliddin (6)
+    1: (2, 1, 2),  # 2-hafta (8–14 kunlar): Juftlik #2 -> Avazbek (1) & Firdavs (2)
+    2: (3, 8, 7),  # 3-hafta (15–21 kunlar): Juftlik #3 -> Mavlonbek (8) & Asadbek (7)
+    3: (4, 5, 3)   # 4-hafta (22–oy oxiri): Juftlik #4 -> Ilyosbek (5) & Asadbek bro (3)
 }
+
 
 DAY_NAMES = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
 MONTH_WEEK_NAMES = ["1-hafta (1–7 kunlar)", "2-hafta (8–14 kunlar)", "3-hafta (15–21 kunlar)", "4-hafta (22–oy oxiri)"]
@@ -141,14 +140,25 @@ class QueueService:
         log_id = await WaterRepository.add_room_water_log(room_id, brought_by_user_id, photo_file_id, now_str)
 
         queue_ids = ROOM_1_WATER_QUEUE if room_id == 1 else ROOM_2_WATER_QUEUE
+        n = len(queue_ids)
+        curr_idx = await WaterRepository.get_room_water_index(room_id)
 
-        # Recalculate water queue starting from bringer
-        if brought_by_user_id in queue_ids:
-            bringer_idx = queue_ids.index(brought_by_user_id)
+        # Advance queue: if current expected person brought it, move to next slot.
+        # Otherwise, find the next upcoming slot for brought_by_user_id and advance past it.
+        if queue_ids[curr_idx % n] == brought_by_user_id:
+            next_idx = (curr_idx + 1) % n
         else:
-            bringer_idx = 0
+            found_idx = None
+            for step in range(n):
+                check_idx = (curr_idx + step) % n
+                if queue_ids[check_idx] == brought_by_user_id:
+                    found_idx = check_idx
+                    break
+            if found_idx is not None:
+                next_idx = (found_idx + 1) % n
+            else:
+                next_idx = (curr_idx + 1) % n
 
-        next_idx = (bringer_idx + 1) % len(queue_ids)
         await WaterRepository.set_room_water_index(room_id, next_idx)
 
         brought_user = await UserRepository.get_user_by_id(brought_by_user_id)
@@ -161,3 +171,4 @@ class QueueService:
             "next_user": next_user,
             "next_index": next_idx
         }
+
