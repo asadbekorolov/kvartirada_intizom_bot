@@ -8,45 +8,12 @@ from database.repositories import TaskRepository, DutyRepository, DeepCleanRepos
 from keyboards.inline import build_task_checklist_keyboard, build_deep_clean_keyboard
 
 
+from services.notifier import send_morning_brief_to_group, send_group_message, format_users_tags
+from utils.cleanup import process_due_message_deletions
+
+
 async def send_morning_brief(bot: Bot):
-    today = datetime.now(settings.timezone).date()
-    today_str = today.strftime("%Y-%m-%d")
-
-    daily_users = await QueueService.get_daily_duty(today)
-    laundry_users = await QueueService.get_laundry_duty(today)
-    r1_water_user, _, _ = await QueueService.get_room_water_duty_info(1)
-    r2_water_user, _, _ = await QueueService.get_room_water_duty_info(2)
-    active_pair_info = await QueueService.get_active_weekly_pair(today)
-
-    daily_names = ", ".join([f"<b>{u['name']}</b>" for u in daily_users])
-    laundry_names = ", ".join([f"<b>{u['name']}</b>" for u in laundry_users])
-    r1_water_name = f"<b>{r1_water_user['name']}</b>" if r1_water_user else "Noma'lum"
-    r2_water_name = f"<b>{r2_water_user['name']}</b>" if r2_water_user else "Noma'lum"
-
-    m1_name = active_pair_info['member1']['name'] if active_pair_info['member1'] else "?"
-    m2_name = active_pair_info['member2']['name'] if active_pair_info['member2'] else "?"
-    pair_str = f"<b>{m1_name} & {m2_name}</b> ({active_pair_info['week_number_in_month']}-hafta)"
-
-    text = (
-        f"☀️ <b>Kvartira Bot — Bugungi kunlik brifing</b> ({today_str})\n\n"
-        f"👨‍🍳 <b>Kunning navbatchisi:</b> {daily_names}\n"
-        f"🧺 <b>Kir yuvish navbati:</b> {laundry_names}\n"
-        f"🚰 <b>Suv navbati:</b>\n"
-        f"   • 🏠 1-Xona baki: {r1_water_name}\n"
-        f"   • 🚪 2-Xona baki: {r2_water_name}\n"
-        f"👥 <b>Haftalik mas'ul juftlik (Bozorlik & Uborqa):</b> {pair_str}\n\n"
-        f"📋 <b>Vazifalar ro'yxati (Tugmalarni bosib belgilang):</b>"
-    )
-
-    tasks = await TaskRepository.get_daily_tasks(today_str)
-    keyboard = build_task_checklist_keyboard(today_str, tasks)
-
-    await bot.send_message(
-        chat_id=settings.GROUP_CHAT_ID,
-        text=text,
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
+    await send_morning_brief_to_group(bot)
 
 
 async def send_evening_trash_reminder(bot: Bot):
@@ -58,13 +25,7 @@ async def send_evening_trash_reminder(bot: Bot):
 
     if not trash_task["is_completed"]:
         daily_users = await QueueService.get_daily_duty(today)
-        tags = []
-        for u in daily_users:
-            if u.get("telegram_id"):
-                tags.append(f"<a href='tg://user?id={u['telegram_id']}'>{u['name']}</a>")
-            else:
-                tags.append(f"<b>{u['name']}</b>")
-        tag_str = ", ".join(tags)
+        tag_str = format_users_tags(daily_users)
 
         text = (
             f"🚨 <b>ESLATMA (21:30): Axlat to'kildimi?</b> 🚨\n\n"
@@ -73,11 +34,10 @@ async def send_evening_trash_reminder(bot: Bot):
         )
 
         keyboard = build_task_checklist_keyboard(today_str, tasks)
-        await bot.send_message(
-            chat_id=settings.GROUP_CHAT_ID,
+        await send_group_message(
+            bot=bot,
             text=text,
-            reply_markup=keyboard,
-            parse_mode="HTML"
+            reply_markup=keyboard
         )
 
 
@@ -101,12 +61,12 @@ async def send_sunday_deep_clean_brief(bot: Bot):
     tasks = await DeepCleanRepository.get_deep_clean_tasks(today_str)
     keyboard = build_deep_clean_keyboard(today_str, tasks)
 
-    await bot.send_message(
-        chat_id=settings.GROUP_CHAT_ID,
+    await send_group_message(
+        bot=bot,
         text=text,
-        reply_markup=keyboard,
-        parse_mode="HTML"
+        reply_markup=keyboard
     )
+
 
 
 async def reset_weekly_overrides_job():
@@ -149,4 +109,13 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
         id="reset_weekly_overrides"
     )
 
+    # 5. Clean up expired 6-hour group messages (Every 2 minutes)
+    scheduler.add_job(
+        process_due_message_deletions,
+        trigger=CronTrigger(minute="*/2", timezone=settings.timezone),
+        args=[bot],
+        id="process_due_message_deletions"
+    )
+
     return scheduler
+

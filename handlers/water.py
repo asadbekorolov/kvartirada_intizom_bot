@@ -8,6 +8,7 @@ from services.queue_service import QueueService
 from database.repositories import UserRepository
 from keyboards.inline import build_water_room_keyboard, build_water_bringer_keyboard
 from utils.cleanup import safe_delete, delete_after
+from services.notifier import send_group_message
 
 router = Router()
 
@@ -156,17 +157,14 @@ async def process_water_photo(message: Message, state: FSMContext, bot: Bot):
         f"Baraka topsin! Navbatdagi xonadoshimiz tayyor tursin! 💧👏"
     )
 
-    try:
-        await bot.send_photo(
-            chat_id=settings.GROUP_CHAT_ID,
-            photo=photo_file_id,
-            caption=group_caption,
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        pass
+    await send_group_message(
+        bot=bot,
+        text=group_caption,
+        photo=photo_file_id
+    )
 
     await state.clear()
+
 
 
 @router.message(WaterStates.waiting_for_photo_proof)

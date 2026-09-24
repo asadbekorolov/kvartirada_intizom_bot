@@ -6,7 +6,9 @@ from config import settings
 from services.queue_service import QueueService
 from database.repositories import TaskRepository, DeepCleanRepository
 from keyboards.inline import build_task_checklist_keyboard, build_deep_clean_keyboard, TASK_LABELS, DEEP_CLEAN_LABELS
-from utils.cleanup import safe_delete, delete_after
+from utils.cleanup import safe_delete, delete_after, schedule_group_message_deletion
+from services.notifier import send_group_message, broadcast_change
+
 
 router = Router()
 
@@ -50,7 +52,10 @@ async def cmd_today_duty(message: Message):
     tasks = await TaskRepository.get_daily_tasks(today_str)
     keyboard = build_task_checklist_keyboard(today_str, tasks)
 
-    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    msg = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    if is_group:
+        await schedule_group_message_deletion(message.bot, msg)
+
 
 
 @router.message(Command("hafta"))
@@ -117,16 +122,31 @@ async def callback_toggle_task(callback: CallbackQuery, current_user: dict):
     new_keyboard = build_task_checklist_keyboard(log_date, result["tasks"])
     await callback.message.edit_reply_markup(reply_markup=new_keyboard)
 
+    completed_by_name = current_user["name"] if current_user else callback.from_user.full_name
+
     # Celebration notification when all 4 tasks are completed
     if all_completed and new_state:
-        completed_by_name = current_user["name"] if current_user else callback.from_user.full_name
         celebration_text = (
             f"🎉 <b>BARCHA KUNLIK VAZIFALAR BAJARILDI!</b> 🎉\n\n"
             f"Bugungi ({log_date}) 4 ta kunlik vazifaning barchasi yakunlandi!\n"
             f"Oxirgi vazifani belgiladi: <b>{completed_by_name}</b>.\n"
             f"Katta rahmat! Xonadonga fayz va tozalik tilaymiz! ✨👏"
         )
-        await callback.message.answer(celebration_text, parse_mode="HTML")
+        await send_group_message(callback.bot, celebration_text)
+    else:
+        remaining = [k for k, v in result["tasks"].items() if not v["is_completed"]]
+        if new_state:
+            details = (
+                f"✅ <b>{task_name}</b> vazifasini <b>{completed_by_name}</b> bajardi.\n"
+                f"⏳ <i>Qolgan vazifalar: {len(remaining)} ta</i>"
+            )
+            await broadcast_change(callback.bot, "Vazifa bajarildi", details, icon="📌")
+        else:
+            details = (
+                f"↩️ <b>{task_name}</b> vazifasi <b>{completed_by_name}</b> tomonidan qaytarildi.\n"
+                f"⏳ <i>Qolgan vazifalar: {len(remaining)} ta</i>"
+            )
+            await broadcast_change(callback.bot, "Vazifa bekor qilindi", details, icon="⚠️")
 
 
 @router.callback_query(F.data.startswith("dc_toggle:"))
@@ -149,9 +169,19 @@ async def callback_toggle_deep_clean(callback: CallbackQuery, current_user: dict
     new_keyboard = build_deep_clean_keyboard(log_date, result["tasks"])
     await callback.message.edit_reply_markup(reply_markup=new_keyboard)
 
+    completed_by_name = current_user["name"] if current_user else callback.from_user.full_name
+
     if all_completed and new_state:
         celebration_text = (
             f"✨ <b>YAKSHANBALIK GENERAL UBORQA MUVAFFAQIYATLI YAKUNLANDI!</b> ✨\n\n"
             f"Barcha 11 ta nazorat punktlari to'liq bajarib chiqildi. Baraka topsin navbatchilar! 🧹👏"
         )
-        await callback.message.answer(celebration_text, parse_mode="HTML")
+        await send_group_message(callback.bot, celebration_text)
+    elif new_state:
+        remaining = [k for k, v in result["tasks"].items() if not v["is_completed"]]
+        details = (
+            f"🧹 <b>{item_name}</b> tozaligi <b>{completed_by_name}</b> tomonidan belgilandi.\n"
+            f"⏳ <i>Qolgan punktlar: {len(remaining)} ta</i>"
+        )
+        await broadcast_change(callback.bot, "General tozalik punkti bajarildi", details, icon="✨")
+

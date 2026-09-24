@@ -17,6 +17,7 @@ from keyboards.inline import (
     build_swap_approval_keyboard
 )
 from utils.cleanup import safe_delete, delete_after
+from services.notifier import send_group_message, broadcast_change
 
 router = Router()
 
@@ -171,12 +172,12 @@ async def callback_select_daily_user(callback: CallbackQuery, state: FSMContext,
         f"Rozimisiz?"
     )
 
-    await bot.send_message(
-        chat_id=settings.GROUP_CHAT_ID,
+    await send_group_message(
+        bot=bot,
         text=card_text,
-        reply_markup=build_swap_approval_keyboard(request_id),
-        parse_mode="HTML"
+        reply_markup=build_swap_approval_keyboard(request_id)
     )
+
 
 
 # --- 3. Whole Weekly Pair Swap Flow ---
@@ -229,12 +230,12 @@ async def callback_select_pair_target_week(callback: CallbackQuery, state: FSMCo
         f"Rozimisiz?"
     )
 
-    await bot.send_message(
-        chat_id=settings.GROUP_CHAT_ID,
+    await send_group_message(
+        bot=bot,
         text=card_text,
-        reply_markup=build_swap_approval_keyboard(request_id),
-        parse_mode="HTML"
+        reply_markup=build_swap_approval_keyboard(request_id)
     )
+
 
 
 # --- 4. Pair Member Proxy Swap Flow ---
@@ -286,12 +287,12 @@ async def callback_select_proxy_user(callback: CallbackQuery, state: FSMContext,
         f"Rozimisiz?"
     )
 
-    await bot.send_message(
-        chat_id=settings.GROUP_CHAT_ID,
+    await send_group_message(
+        bot=bot,
         text=card_text,
-        reply_markup=build_swap_approval_keyboard(request_id),
-        parse_mode="HTML"
+        reply_markup=build_swap_approval_keyboard(request_id)
     )
+
 
 
 # --- 5. Swap Approvals & Rejections ---

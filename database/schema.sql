@@ -74,3 +74,19 @@ CREATE TABLE IF NOT EXISTS deep_clean_logs (
     PRIMARY KEY(log_date, item_key),
     FOREIGN KEY(completed_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- General bot settings (e.g. active group_chat_id)
+CREATE TABLE IF NOT EXISTS bot_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- Scheduled message deletions (e.g. auto delete group messages after 6 hours)
+CREATE TABLE IF NOT EXISTS scheduled_message_deletions (
+    chat_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    delete_at TEXT NOT NULL,
+    PRIMARY KEY(chat_id, message_id)
+);
+
+

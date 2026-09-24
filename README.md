@@ -53,10 +53,13 @@ A production-ready, modular, and resilient Telegram bot built with **aiogram 3.x
 ## 🌟 Asosiy Imkoniyatlar & Anti-Spam UX
 
 1. **Anti-Spam & Guruh Tozaligi:**
+   - **Xabarlarning 6 soatda avtomatik o'chishi:** Bot tomonidan guruhga yuborilgan barcha xabarlar (ertalabki brifing, vazifa o'zgarishlari, suv hisobotlari, tabriknomalar va h.k.) roppa-rosa **6 soatdan so'ng (21,600 soniya)** guruhdan avtomatik o'chirib tashlanadi.
+   - **Baza orqali ishonchli saqlash:** Xabarlarning o'chish vaqti SQLite bazasida (`scheduled_message_deletions`) saqlanadi, shuning uchun bot qayta ishga tushsa yoki server o'chib-yonsa ham, 6 soat to'lgach xabarlar aniq o'chiriladi.
    - Guruhdagi barcha buyruqlar (`/start`, `/bugun`, `/suv`, `/hafta`, `/almashish`) avtomatik ravishda o'chiriladi (`await message.delete()`).
    - Tugmalar bosilganda xabar ichida o'zgaradi (In-Place Edit), yangi ortiqcha xabarlar chiqarilmaydi.
    - Interaktiv jarayonlar (rasm yuborish, navbat tanlash) to'liq botning shaxsiy chatiga (PM) deep-link orqali yo'naltiriladi.
-   - Guruhdagi vaqtinchalik xabarlar 30 soniyadan so'ng avtomatik o'chiriladi.
+   - Guruhdagi qisqa vaqtinchalik javob xabarlari 30-45 soniyada o'chiriladi.
+
 
 2. **2 ta Alohida Suv Baki (Dual-Room Queues):**
    - 1-xona va 2-xona alohida baklar navbatini mustaqil boshqaradi.
@@ -67,11 +70,26 @@ A production-ready, modular, and resilient Telegram bot built with **aiogram 3.x
    - **Haftalik juftlik almashish** (masalan: 1-hafta juftligi 3-hafta juftligi bilan to'liq almashishi).
    - **Juftlik ichida o'rinbosar biriktirish** (masalan: Omadbek o'z o'rniga boshqa xonadoshni biriktirishi).
 
-4. **Avtomatlashtirilgan Eslatmalar (Asia/Tashkent):**
-   - **07:30** — Kunlik brifing + 4 ta vazifa nazorat ro'yxati (Taom, Non, Idishlar, Axlat).
-   - **21:30** — Axlat to'kilmagan bo'lsa navbatchilarni teg qilib qattiq eslatma yuborish.
-   - **Yakshanba 09:00** — 11 ta punktli general tozalik nazorat ro'yxati.
-   - **Yakshanba 23:59** — Vaqtinchalik o'zgartirishlarni avtomatik tozalash va standart rejani tiklash.
+4. **Avtomatlashtirilgan Eslatmalar & Guruh Bildirishnomalari (Asia/Tashkent):**
+   - **Guruhni avtomatik aniqlash & ulash:** Bot guruhga qo'shilganda yoki guruhda `/guruh_ulash` yozilganda, guruh chat ID bazada saqlanadi va bot rasmiy xabarlarni ushbu guruhga yuboradi.
+   - **07:30 (Har kuni ertalab):** Guruhga kunlik to'liq brifing yuboriladi:
+     - 👨‍🍳 Kunlik navbatchi (Telegram mention tegi bilan);
+     - 🧺 Kir yuvish navbati;
+     - 🚰 1-xona va 2-xona baki suv navbati;
+     - 👥 Bozorlik va uborqa bo'yicha mas'ul juftlik;
+     - 📋 Kunlik 4 ta vazifa checklisti (Non, Oshxona, Idishlar, Axlat).
+   - **Real vaqtda o'zgarishlarni aytib turish:**
+     - 📌 Vazifalar bajarilganda kim bajargani va qolgan vazifalar soni guruhga xabar qilinadi;
+     - 🚰 Suv olib kelinganda foto isboti va keyingi navbatchi guruhga e'lon qilinadi;
+     - 🔄 Navbatchilik yoki haftalik juftlik almashuvi tasdiqlanganda guruhga yangilanish yuboriladi;
+     - ⚠️ Admin majburiy o'zgartirish kiritganda guruh xabardor qilinadi;
+     - 👋 Yangi xonadosh hisobini bog'laganda guruhga ma'lumot beriladi;
+     - 🎉 Barcha vazifalar yakunlanganda umumiy tabrik yuboriladi.
+   - **Qo'lda chaqirish:** Guruhda istalgan payt `/ertalab` yoki `/bugun` yozib ertalabki eslatmani qayta chaqirish mumkin.
+   - **21:30:** Axlat to'kilmagan bo'lsa navbatchilarni teg qilib qattiq eslatma yuborish.
+   - **Yakshanba 09:00:** 11 ta punktli general tozalik nazorat ro'yxati.
+   - **Yakshanba 23:59:** Vaqtinchalik o'zgartirishlarni avtomatik tozalash va standart rejani tiklash.
+
 
 5. **24/7 Keep-Alive HTTP Server:**
    - Render / Koyeb platformalarida uxlab qolmasligi uchun `http://0.0.0.0:8080/health` endpointi faol.

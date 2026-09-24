@@ -6,7 +6,9 @@ from database.connection import init_db
 from middlewares.auth import AuthMiddleware
 from services.scheduler_jobs import setup_scheduler
 from services.web_server import start_web_server
+from utils.cleanup import process_due_message_deletions
 from handlers import common, duty, water, swap, admin
+
 
 
 async def main():
@@ -42,6 +44,10 @@ async def main():
     scheduler = setup_scheduler(bot)
     scheduler.start()
     logger.info("APScheduler started with Tashkent timezone jobs.")
+
+    # Process any overdue message deletions from previous downtime
+    await process_due_message_deletions(bot)
+
 
     # 7. Start Lightweight HTTP Keep-Alive Server
     web_runner = await start_web_server(host="0.0.0.0", port=settings.PORT)

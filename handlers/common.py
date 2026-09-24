@@ -1,9 +1,11 @@
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, Command, CommandObject
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from database.repositories import UserRepository
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ChatMemberUpdated
+from database.repositories import UserRepository, SettingsRepository
 from keyboards.reply import get_main_reply_keyboard
-from utils.cleanup import safe_delete, delete_after
+from utils.cleanup import safe_delete, delete_after, schedule_group_message_deletion
+from services.notifier import send_morning_brief_to_group, broadcast_change
+
 
 router = Router()
 
@@ -136,6 +138,64 @@ async def callback_claim_user(callback: CallbackQuery):
     )
     await callback.message.answer("Asosiy menyu faollashtirildi:", reply_markup=get_main_reply_keyboard())
 
+    # Broadcast new flatmate connection to the group
+    await broadcast_change(
+        bot=callback.bot,
+        title="Yangi a'zo ulandi",
+        details=f"👤 <b>{user['name']}</b> (Xona {user['room_number']}) o'zining Telegram hisobini botga muvaffaqiyatli bog'ladi!",
+        icon="👋"
+    )
+
+
+@router.my_chat_member()
+async def on_my_chat_member(event: ChatMemberUpdated, bot: Bot):
+    if event.chat.type in ("group", "supergroup"):
+        if event.new_chat_member.status in ("member", "administrator"):
+            await SettingsRepository.set_group_chat_id(event.chat.id)
+            welcome_text = (
+                "🏢 <b>Assalomu alaykum, hurmatli xonadoshlar!</b>\n\n"
+                "<b>Kvartira Intizom Boti</b> ushbu guruhga muvaffaqiyatli ulandi!\n\n"
+                "📢 <b>Bot ushbu guruhga quyidagi xabarlarni yuborib turadi:</b>\n"
+                "• ☀️ <b>Har kuni ertalab (07:30):</b> Kunlik navbatchi, kir yuvish, suv navbati va vazifalar checklisti;\n"
+                "• 🔄 <b>O'zgarishlar:</b> Vazifalar bajarilishi, suv olib kelinishi, navbat almashuvlari va admin yangilanishlari;\n"
+                "• 🚨 <b>Kechki eslatma (21:30):</b> Axlat to'kish nazorati;\n"
+                "• 🧹 <b>Yakshanba (09:00):</b> General tozalik brifingi.\n\n"
+                "💡 <i>Ertalabki xabarni hoziroq ko'rish uchun:</i> /ertalab yoki /bugun\n"
+                "⚙️ <i>Guruhni qayta ulash uchun:</i> /guruh_ulash"
+            )
+            welcome_msg = await bot.send_message(event.chat.id, welcome_text, parse_mode="HTML")
+            await schedule_group_message_deletion(bot, welcome_msg)
+
+
+@router.message(Command("set_group", "guruh_ulash"))
+async def cmd_set_group(message: Message):
+    if message.chat.type not in ("group", "supergroup"):
+        await message.answer("⚠️ Ushbu buyruq faqat xonadon guruhida berilishi kerak!")
+        return
+    await SettingsRepository.set_group_chat_id(message.chat.id)
+    confirm_msg = await message.answer(
+        "✅ <b>Guruh muvaffaqiyatli ulandi!</b>\n\n"
+        f"Ushbu guruh (ID: <code>{message.chat.id}</code>) bot uchun rasmiy bildirishnoma guruhi qilib belgilandi.\n"
+        "Endi barcha ertalabki eslatmalar va tizimdagi o'zgarishlar shu yerga yuboriladi.",
+        parse_mode="HTML"
+    )
+    await schedule_group_message_deletion(message.bot, confirm_msg)
+
+
+
+@router.message(Command("ertalab", "eslatma"))
+async def cmd_send_morning(message: Message, bot: Bot):
+    is_group = message.chat.type in ("group", "supergroup")
+    if is_group:
+        await SettingsRepository.set_group_chat_id(message.chat.id)
+        await send_morning_brief_to_group(bot, chat_id=message.chat.id)
+    else:
+        success = await send_morning_brief_to_group(bot)
+        if success:
+            await message.answer("✅ Ertalabki brifing guruhga yuborildi!")
+        else:
+            await message.answer("⚠️ Guruh chat ID topilmadi. Botni avval guruhga qo'shib /guruh_ulash buyrug'ini yuboring.")
+
 
 @router.message(Command("help"))
 @router.message(F.text == "ℹ️ Yordam")
@@ -157,8 +217,10 @@ async def cmd_help(message: Message):
         "• 4-hafta (22–oy oxiri): Mavlonbek & Asadbek\n\n"
         "<b>🔄 Navbat Almashish (/almashish):</b>\n"
         "• Kunlik navbatchilik, butun haftalik juftlik yoki juftlik ichida alohida o'rinbosar almashish imkoniyati.\n\n"
-        "<b>⚙️ Profilni Qayta Tanlash:</b>\n"
-        "• <code>/unbind</code> yoki <code>/qayta_tanlash</code> - Profilingizni bekor qilib yangitdan tanlash.\n"
+        "<b>🔔 Guruh xabarlari:</b>\n"
+        "• <code>/ertalab</code> yoki <code>/bugun</code> — Ertalabki brifingni darhol ko'rish.\n"
+        "• <code>/guruh_ulash</code> — Guruhni rasmiy eslatmalar guruhi qilib belgilash.\n"
+        "• <code>/unbind</code> yoki <code>/qayta_tanlash</code> — Profilingizni bekor qilib yangitdan tanlash.\n"
     )
     
     if is_group:
@@ -166,3 +228,4 @@ async def cmd_help(message: Message):
         await delete_after(msg, 45)
     else:
         await message.answer(text, reply_markup=get_main_reply_keyboard(), parse_mode="HTML")
+

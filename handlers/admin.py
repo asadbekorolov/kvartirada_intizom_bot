@@ -7,6 +7,7 @@ from config import settings
 from services.queue_service import ROOM_1_WATER_QUEUE, ROOM_2_WATER_QUEUE, DAY_NAMES, MONTH_WEEK_NAMES
 from database.repositories import UserRepository, WaterRepository, DutyRepository, TaskRepository
 from utils.cleanup import safe_delete, delete_after
+from services.notifier import broadcast_change
 
 router = Router()
 router.message.filter(IsAdminFilter())
@@ -57,6 +58,18 @@ async def cmd_suv_admin(message: Message):
     )
     if is_group:
         await delete_after(msg, 45)
+
+    await broadcast_change(
+        bot=message.bot,
+        title="Admin suv navbatini o'zgartirdi",
+        details=(
+            f"🏠 <b>Xona:</b> {room_id}-xona baki\n"
+            f"🚰 <b>Yangi navbatchi:</b> <b>{user['name']}</b>\n"
+            f"<i>O'zgartirish admin tomonidan kiritildi.</i>"
+        ),
+        icon="⚠️"
+    )
+
 
 
 @router.message(Command("almash_admin"))
@@ -115,6 +128,17 @@ async def cmd_almash_admin(message: Message):
     if is_group:
         await delete_after(msg, 45)
 
+    await broadcast_change(
+        bot=message.bot,
+        title="Admin kunlik navbatchilikni o'zgartirdi",
+        details=(
+            f"📅 <b>Kun:</b> {day_name}\n"
+            f"👨‍🍳 <b>Yangi navbatchi:</b> <b>{names_str}</b>\n"
+            f"<i>Kunlik navbatchilik admin tomonidan qayta belgilandi.</i>"
+        ),
+        icon="⚠️"
+    )
+
 
 @router.message(Command("pair_admin"))
 async def cmd_pair_admin(message: Message):
@@ -152,6 +176,18 @@ async def cmd_pair_admin(message: Message):
     )
     if is_group:
         await delete_after(msg, 45)
+
+    await broadcast_change(
+        bot=message.bot,
+        title="Admin haftalik juftlikni o'zgartirdi",
+        details=(
+            f"🗓 <b>Hafta:</b> {MONTH_WEEK_NAMES[week_idx]}\n"
+            f"👥 <b>Yangi mas'ul juftlik:</b> <b>{u1['name']} & {u2['name']}</b> (Juftlik #{pair_id})\n"
+            f"<i>Bozorlik va uborqa rejasi admin tomonidan qayta belgilandi.</i>"
+        ),
+        icon="⚠️"
+    )
+
 
 
 @router.message(Command("reset_tasks"))

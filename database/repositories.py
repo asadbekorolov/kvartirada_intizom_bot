@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from database.connection import get_db
+from config import settings
 
 
 class UserRepository:
@@ -339,3 +340,77 @@ class DeepCleanRepository:
             "all_completed": all_completed,
             "tasks": updated
         }
+
+
+class SettingsRepository:
+    @staticmethod
+    async def get_setting(key: str, default: Optional[str] = None) -> Optional[str]:
+        async with get_db() as db:
+            cursor = await db.execute("SELECT value FROM bot_settings WHERE key = ?", (key,))
+            row = await cursor.fetchone()
+            return row["value"] if row else default
+
+    @staticmethod
+    async def set_setting(key: str, value: Any):
+        async with get_db() as db:
+            await db.execute(
+                """
+                INSERT INTO bot_settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, str(value))
+            )
+            await db.commit()
+
+    @staticmethod
+    async def get_group_chat_id() -> Optional[int]:
+        val = await SettingsRepository.get_setting("group_chat_id")
+        if val is not None:
+            try:
+                return int(val)
+            except ValueError:
+                pass
+        if hasattr(settings, "GROUP_CHAT_ID") and settings.GROUP_CHAT_ID:
+            return settings.GROUP_CHAT_ID
+        return None
+
+    @staticmethod
+    async def set_group_chat_id(chat_id: int):
+        await SettingsRepository.set_setting("group_chat_id", str(chat_id))
+
+
+class MessageDeletionRepository:
+    @staticmethod
+    async def schedule_deletion(chat_id: int, message_id: int, delete_at_iso: str):
+        async with get_db() as db:
+            await db.execute(
+                """
+                INSERT INTO scheduled_message_deletions (chat_id, message_id, delete_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(chat_id, message_id) DO UPDATE SET delete_at = excluded.delete_at
+                """,
+                (chat_id, message_id, delete_at_iso)
+            )
+            await db.commit()
+
+    @staticmethod
+    async def get_due_deletions(current_iso: str) -> List[Dict[str, Any]]:
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT chat_id, message_id, delete_at FROM scheduled_message_deletions WHERE delete_at <= ?",
+                (current_iso,)
+            )
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    @staticmethod
+    async def remove_deletion(chat_id: int, message_id: int):
+        async with get_db() as db:
+            await db.execute(
+                "DELETE FROM scheduled_message_deletions WHERE chat_id = ? AND message_id = ?",
+                (chat_id, message_id)
+            )
+            await db.commit()
+
+

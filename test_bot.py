@@ -17,8 +17,14 @@ from database.repositories import (
     TaskRepository,
     WaterRepository,
     SwapRepository,
-    DeepCleanRepository
+    DeepCleanRepository,
+    SettingsRepository,
+    MessageDeletionRepository
 )
+from services.notifier import format_user_tag, format_users_tags, broadcast_change, send_morning_brief_to_group
+from utils.cleanup import GROUP_MESSAGE_LIFETIME_SECONDS, process_due_message_deletions
+
+
 from services.queue_service import (
     QueueService,
     ROOM_1_WATER_QUEUE,
@@ -170,9 +176,60 @@ async def run_tests():
     assert u7["telegram_id"] == 6149675718
     print(f"✅ User 7 Re-bind OK: {u7['name']} -> TG ID {u7['telegram_id']}")
 
+    print("\n8. Testing Group Settings, Mention Tagging & Change Broadcasts...")
+    # Dynamic Group Chat ID setting
+    await SettingsRepository.set_group_chat_id(-1009876543210)
+    saved_gid = await SettingsRepository.get_group_chat_id()
+    assert saved_gid == -1009876543210
+    print(f"✅ SettingsRepository Group ID OK: {saved_gid}")
+
+    # Tagging with Telegram mention vs bold
+    tag_with_tg = format_user_tag(u7)
+    assert "tg://user?id=6149675718" in tag_with_tg
+    tag_without_tg = format_user_tag({"name": "Avazbek", "telegram_id": None})
+    assert tag_without_tg == "<b>Avazbek</b>"
+    print(f"✅ User Tagging OK: With TG={tag_with_tg}, Without TG={tag_without_tg}")
+
+    # Format list of users
+    users_tags = format_users_tags([u7, {"name": "Avazbek", "telegram_id": None}])
+    assert "Asadbek" in users_tags and "Avazbek" in users_tags
+    print(f"✅ Multiple User Tags OK: {users_tags}")
+
+    print("\n9. Testing 6-Hour Group Message Deletion System...")
+    assert GROUP_MESSAGE_LIFETIME_SECONDS == 21600 # 6 hours = 21600s
+    print(f"✅ Lifetime constant: {GROUP_MESSAGE_LIFETIME_SECONDS} seconds (6 hours)")
+
+    # Test scheduling deletion in DB
+    from datetime import timedelta
+    test_chat_id = -1009876543210
+    test_msg_id_1 = 12345
+    test_msg_id_2 = 67890
+
+    # msg 1: expires in the future (+6 hours)
+    future_time = (datetime.now() + timedelta(hours=6)).isoformat()
+    await MessageDeletionRepository.schedule_deletion(test_chat_id, test_msg_id_1, future_time)
+
+    # msg 2: already expired (1 hour ago)
+    past_time = (datetime.now() - timedelta(hours=1)).isoformat()
+    await MessageDeletionRepository.schedule_deletion(test_chat_id, test_msg_id_2, past_time)
+
+    now_iso = datetime.now().isoformat()
+    due_items = await MessageDeletionRepository.get_due_deletions(now_iso)
+    assert len(due_items) == 1
+    assert due_items[0]["message_id"] == test_msg_id_2
+    print(f"✅ Due deletions filtering OK: Found expired message {due_items[0]['message_id']}")
+
+    # Remove deletion
+    await MessageDeletionRepository.remove_deletion(test_chat_id, test_msg_id_2)
+    due_after_remove = await MessageDeletionRepository.get_due_deletions(now_iso)
+    assert len(due_after_remove) == 0
+    print("✅ Deletion removal OK")
+
     print("\n" + "=" * 60)
     print("🎉 ALL TESTS PASSED SUCCESSFULLY! PROD-READY SYSTEM VERIFIED!")
     print("=" * 60)
+
+
 
 
     # Clean up test db file
